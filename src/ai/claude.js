@@ -94,7 +94,7 @@ export async function callClaude(apiKey, messages, contextStr = '') {
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: 'claude-opus-4-5',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: systemPrompt,
       messages,
@@ -117,7 +117,6 @@ export async function getAIInsight(apiKey, prompt, state, today) {
 
 export async function analyzePhoto(apiKey, base64Image, mediaType = 'image/jpeg') {
   if (!apiKey) throw new Error('No API key set.')
-
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -127,7 +126,7 @@ export async function analyzePhoto(apiKey, base64Image, mediaType = 'image/jpeg'
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: 'claude-opus-4-5',
+      model: 'claude-sonnet-4-6',
       max_tokens: 512,
       system: 'You are a nutrition analyst. Estimate macros for food photos. Return JSON: { name, kcal, protein, carbs, fat, confidence: "high"|"medium"|"low", notes }',
       messages: [
