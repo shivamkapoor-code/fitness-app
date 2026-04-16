@@ -12,7 +12,7 @@ import { SUPPLEMENTS } from '../data/supplements'
 const STIFFNESS_LABELS = ['', 'Minimal', 'Mild', 'Moderate', 'Significant', 'Severe']
 const STIFFNESS_COLORS = ['', 'text-emerald-400', 'text-emerald-400', 'text-amber-400', 'text-red-400', 'text-red-500']
 
-export function Dashboard({ state, setStiffness, today, onNavigate }) {
+export function Dashboard({ state, setStiffness, today, onNavigate, user }) {
   const [insight, setInsight] = useState('')
   const [loadingInsight, setLoadingInsight] = useState(false)
 
@@ -81,8 +81,13 @@ export function Dashboard({ state, setStiffness, today, onNavigate }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-white tracking-wide">Dashboard</h1>
-          <p className="text-slate-400 text-xs">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+          <h1 className="font-heading text-2xl font-bold text-primary-color tracking-wide">Dashboard</h1>
+          {user?.display_name && (
+            <p className="text-secondary-color" style={{ fontSize: 12, marginTop: 2 }}>
+              Good morning, {user.display_name}
+            </p>
+          )}
+          <p className="text-muted-color text-xs">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
         </div>
         <div className="text-right">
           <div className={`font-heading text-lg font-bold ${bioAge < 36 ? 'text-emerald-400' : bioAge <= 40 ? 'text-amber-400' : 'text-red-400'}`}>
@@ -103,15 +108,15 @@ export function Dashboard({ state, setStiffness, today, onNavigate }) {
       {/* Today's workout card */}
       <button
         onClick={() => onNavigate('workout')}
-        className="w-full bg-slate-800 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-700 transition-colors"
+        className="glass w-full p-4 flex items-center justify-between hover:opacity-90 transition-opacity"
       >
         <div className="text-left">
-          <div className="text-slate-400 text-xs uppercase tracking-widest font-heading mb-1">Today's Workout</div>
-          <div className="font-heading text-xl font-bold text-white">{todayWorkout.name}</div>
-          <div className="text-emerald-400 text-xs mt-1">{todayWorkout.exercises?.length ?? 0} exercises{todayWorkout.cardio?.type !== 'none' ? ` · ${todayWorkout.cardio?.desc}` : ''}</div>
+          <div className="text-muted-color text-xs uppercase tracking-widest font-heading mb-1">Today's Workout</div>
+          <div className="font-heading text-xl font-bold text-primary-color">{todayWorkout.name}</div>
+          <div className="text-accent text-xs mt-1">{todayWorkout.exercises?.length ?? 0} exercises{todayWorkout.cardio?.type !== 'none' ? ` · ${todayWorkout.cardio?.desc}` : ''}</div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="bg-emerald-600 text-white rounded-xl px-4 py-2 font-heading text-sm font-semibold">
+          <div className="btn-primary rounded-xl px-4 py-2 font-heading text-sm font-semibold">
             Start
           </div>
           <ChevronRight size={16} className="text-slate-500" />
@@ -119,9 +124,9 @@ export function Dashboard({ state, setStiffness, today, onNavigate }) {
       </button>
 
       {/* Morning stiffness */}
-      <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
+      <div className="glass p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">Morning Stiffness</h3>
+          <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">Morning Stiffness</h3>
           {stiffness !== null && (
             <span className={`font-heading text-sm font-bold ${STIFFNESS_COLORS[stiffness]}`}>
               {stiffness}/5 — {STIFFNESS_LABELS[stiffness]}
@@ -136,7 +141,7 @@ export function Dashboard({ state, setStiffness, today, onNavigate }) {
               className={`flex-1 py-2.5 rounded-xl font-heading text-sm font-bold transition-colors ${
                 stiffness === v
                   ? v <= 2 ? 'bg-emerald-500 text-white' : v === 3 ? 'bg-amber-500 text-white' : 'bg-red-500 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  : 'glass-elevated text-primary-color hover:opacity-80'
               }`}
             >
               {v}
@@ -152,10 +157,10 @@ export function Dashboard({ state, setStiffness, today, onNavigate }) {
       </div>
 
       {/* Macro rings */}
-      <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
+      <div className="glass p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">Today's Macros</h3>
-          <button onClick={() => onNavigate('nutrition')} className="text-emerald-400 text-xs font-medium">Add food →</button>
+          <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">Today's Macros</h3>
+          <button onClick={() => onNavigate('nutrition')} className="text-accent text-xs font-medium">Add food →</button>
         </div>
         <MacroRings totals={todayNutrition} />
         <div className="grid grid-cols-4 gap-2 pt-1">
@@ -166,7 +171,7 @@ export function Dashboard({ state, setStiffness, today, onNavigate }) {
             { label: 'Fat', val: remFat, unit: 'g' },
           ].map(({ label, val, unit }) => (
             <div key={label} className="text-center">
-              <div className={`font-heading text-base font-bold ${val < 0 ? 'text-red-400' : 'text-white'}`}>{val > 0 ? val : 0}{unit}</div>
+              <div className={`font-heading text-base font-bold ${val < 0 ? 'text-red-400' : 'text-primary-color'}`}>{val > 0 ? val : 0}{unit}</div>
               <div className="text-slate-500 text-[9px]">{label}</div>
             </div>
           ))}
@@ -174,17 +179,17 @@ export function Dashboard({ state, setStiffness, today, onNavigate }) {
       </div>
 
       {/* Inflammation score */}
-      <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
+      <div className="glass p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">Inflammation</h3>
-          <button onClick={() => onNavigate('inflammation')} className="text-emerald-400 text-xs font-medium">Log →</button>
+          <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">Inflammation</h3>
+          <button onClick={() => onNavigate('inflammation')} className="text-accent text-xs font-medium">Log →</button>
         </div>
         <div className="flex items-center gap-3">
           <div className={`font-heading text-4xl font-bold ${inflam7[6] <= 2 ? 'text-emerald-400' : inflam7[6] <= 3.5 ? 'text-amber-400' : 'text-red-400'}`}>
             {todayInflam.toFixed(1)}
           </div>
           <div className="flex-1">
-            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(30,41,59,0.5)' }}>
               <div
                 className={`h-full rounded-full transition-all ${inflamColor}`}
                 style={{ width: `${(todayInflam / 5) * 100}%` }}
@@ -206,7 +211,7 @@ export function Dashboard({ state, setStiffness, today, onNavigate }) {
       </div>
 
       {/* Supplement ring */}
-      <button onClick={() => onNavigate('supplements')} className="w-full bg-slate-800 rounded-2xl p-4 flex items-center gap-4 hover:bg-slate-700 transition-colors">
+      <button onClick={() => onNavigate('supplements')} className="glass w-full p-4 flex items-center gap-4 hover:opacity-90 transition-opacity">
         <div className="relative w-14 h-14">
           <svg width={56} height={56} className="-rotate-90">
             <circle cx={28} cy={28} r={22} stroke="#1e293b" strokeWidth={8} fill="none" />
@@ -217,26 +222,26 @@ export function Dashboard({ state, setStiffness, today, onNavigate }) {
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="font-heading text-xs font-bold text-white">{suppPct}%</span>
+            <span className="font-heading text-xs font-bold text-primary-color">{suppPct}%</span>
           </div>
         </div>
         <div className="flex-1">
-          <div className="font-heading text-sm font-semibold text-white">Supplements</div>
-          <div className="text-slate-400 text-xs">{suppTaken} of {suppTotal} taken today</div>
+          <div className="font-heading text-sm font-semibold text-primary-color">Supplements</div>
+          <div className="text-muted-color text-xs">{suppTaken} of {suppTotal} taken today</div>
         </div>
         <ChevronRight size={16} className="text-slate-500" />
       </button>
 
       {/* Body composition projection */}
       {projection && (
-        <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
-          <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">Body Projection</h3>
-          <div className="text-slate-400 text-xs">At current rate: {projection.weeklyRate > 0 ? '+' : ''}{projection.weeklyRate} lbs/week</div>
+        <div className="glass p-4 space-y-3">
+          <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">Body Projection</h3>
+          <div className="text-muted-color text-xs">At current rate: {projection.weeklyRate > 0 ? '+' : ''}{projection.weeklyRate} lbs/week</div>
           <div className="grid grid-cols-3 gap-2">
             {projection.projections.map((p) => (
-              <div key={p.weeks} className="bg-slate-700 rounded-xl p-3 text-center">
-                <div className="font-heading text-lg font-bold text-white">{p.weight} lbs</div>
-                <div className="text-emerald-400 text-xs">{p.bodyFat}% BF</div>
+              <div key={p.weeks} className="glass-elevated rounded-xl p-3 text-center">
+                <div className="font-heading text-lg font-bold text-primary-color">{p.weight} lbs</div>
+                <div className="text-accent text-xs">{p.bodyFat}% BF</div>
                 <div className="text-slate-500 text-[10px] mt-0.5">{p.date}</div>
               </div>
             ))}
@@ -245,27 +250,27 @@ export function Dashboard({ state, setStiffness, today, onNavigate }) {
       )}
 
       {/* AI daily insight */}
-      <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
+      <div className="glass p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Zap size={14} className="text-emerald-400" />
-            <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">Daily AI Leverage</h3>
+            <Zap size={14} className="text-accent" />
+            <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">Daily AI Leverage</h3>
           </div>
-          <button onClick={loadInsight} disabled={loadingInsight} className="flex items-center gap-1.5 text-emerald-400 text-xs font-medium">
+          <button onClick={loadInsight} disabled={loadingInsight} className="flex items-center gap-1.5 text-accent text-xs font-medium">
             {loadingInsight ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             {loadingInsight ? 'Thinking...' : 'Refresh'}
           </button>
         </div>
         {insight ? (
-          <p className="text-slate-300 text-sm leading-relaxed">{insight}</p>
+          <p className="text-primary-color text-sm leading-relaxed">{insight}</p>
         ) : (
           <p className="text-slate-500 text-sm italic">Tap Refresh for today's highest-leverage action.</p>
         )}
       </div>
 
       {/* The 3 Levers */}
-      <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
-        <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">The 3 Levers</h3>
+      <div className="glass p-4 space-y-3">
+        <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">The 3 Levers</h3>
         {[
           { lever: 'Training', action: 'Progressive overload + protect L5-S1', color: 'bg-blue-500/20 text-blue-300' },
           { lever: 'Nutrition', action: '185g protein daily, adjust carbs first', color: 'bg-amber-500/20 text-amber-300' },

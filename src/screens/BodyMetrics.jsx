@@ -5,17 +5,18 @@ import { calcBioAge } from '../utils/bioAge'
 import { calcBodyProjection } from '../utils/projection'
 import { getAIInsight } from '../ai/claude'
 import { showToast } from '../utils/toast'
+import { detectAndParseCSV } from '../lib/csvImport'
 
 const TARGETS = { weight: 175, bodyFat: 15, visceralFat: 9, waist: null }
 
-function StatCard({ label, value, unit, target, color = 'text-white' }) {
+function StatCard({ label, value, unit, target, color = 'text-primary-color' }) {
   const diff = target != null && value != null ? value - target : null
   return (
-    <div className="bg-slate-700 rounded-xl p-3">
+    <div className="glass-elevated rounded-xl p-3">
       <div className={`font-heading text-xl font-bold ${color}`}>{value ?? '—'}{value != null ? unit : ''}</div>
-      <div className="text-slate-400 text-xs mt-0.5">{label}</div>
+      <div className="text-muted-color text-xs mt-0.5">{label}</div>
       {diff !== null && (
-        <div className={`text-[10px] mt-1 ${diff > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+        <div className={`text-[10px] mt-1 ${diff > 0 ? 'text-amber-400' : 'text-accent'}`}>
           {diff > 0 ? `${diff.toFixed(1)}${unit} above target` : `${Math.abs(diff).toFixed(1)}${unit} below target ✓`}
         </div>
       )}
@@ -24,7 +25,7 @@ function StatCard({ label, value, unit, target, color = 'text-white' }) {
 }
 
 function SVGChart({ data, color = '#10b981', label, unit = '' }) {
-  if (data.length < 2) return <div className="text-slate-500 text-sm text-center py-4">Need 2+ entries to show chart</div>
+  if (data.length < 2) return <div className="text-muted-color text-sm text-center py-4">Need 2+ entries to show chart</div>
 
   const values = data.map((d) => d.value)
   const min = Math.min(...values)
@@ -40,7 +41,7 @@ function SVGChart({ data, color = '#10b981', label, unit = '' }) {
 
   return (
     <div className="space-y-1">
-      <div className="flex justify-between text-slate-500 text-[10px]">
+      <div className="flex justify-between text-muted-color text-[10px]">
         <span>{data[0]?.date}</span>
         <span>{label}</span>
         <span>{data[data.length - 1]?.date}</span>
@@ -60,7 +61,7 @@ function SVGChart({ data, color = '#10b981', label, unit = '' }) {
           return <circle key={i} cx={x} cy={y} r={3} fill={color} />
         })}
       </svg>
-      <div className="flex justify-between text-slate-400 text-xs">
+      <div className="flex justify-between text-muted-color text-xs">
         <span>{min}{unit}</span>
         <span>{max}{unit}</span>
       </div>
@@ -68,11 +69,12 @@ function SVGChart({ data, color = '#10b981', label, unit = '' }) {
   )
 }
 
-export function BodyMetrics({ state, addBodyMetric, today }) {
+export function BodyMetrics({ state, addBodyMetric, today, user }) {
   const [showCheckin, setShowCheckin] = useState(false)
   const [form, setForm] = useState({ date: today, weight: '', bodyFat: '', visceralFat: '', waist: '', neck: '', muscleMass: '' })
   const [insight, setInsight] = useState('')
   const [loading, setLoading] = useState(false)
+  const [csvPreview, setCsvPreview] = useState(null) // { rows, unmappedColumns, type }
 
   const metrics = state.bodyMetrics
   const latest = metrics.length > 0 ? metrics[metrics.length - 1] : null
@@ -97,38 +99,34 @@ export function BodyMetrics({ state, addBodyMetric, today }) {
     setForm({ date: today, weight: '', bodyFat: '', visceralFat: '', waist: '', neck: '', muscleMass: '' })
   }
 
-  function importRenpho(e) {
+  function handleCSVFile(e) {
     const file = e.target.files[0]
     if (!file) return
     const reader = new FileReader()
     reader.onload = (ev) => {
-      try {
-        const lines = ev.target.result.split('\n').filter(Boolean)
-        const header = lines[0].split(',').map((h) => h.trim().toLowerCase())
-        let imported = 0
-        for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',').map((c) => c.trim().replace(/"/g, ''))
-          const row = {}
-          header.forEach((h, idx) => { row[h] = cols[idx] })
-          const date = row['time of measurement']?.slice(0, 10) ?? row['date']?.slice(0, 10)
-          if (!date) continue
-          const entry = {
-            date,
-            weight: row['weight(lbs)'] ? parseFloat(row['weight(lbs)']) : row['weight(kg)'] ? parseFloat(row['weight(kg)']) * 2.205 : undefined,
-            bodyFat: row['body fat(%)'] ? parseFloat(row['body fat(%)']) : undefined,
-            visceralFat: row['visceral fat'] ? parseFloat(row['visceral fat']) : undefined,
-            muscleMass: row['muscle mass(lbs)'] ? parseFloat(row['muscle mass(lbs)']) : undefined,
-          }
-          Object.keys(entry).forEach((k) => entry[k] === undefined && delete entry[k])
-          if (entry.date) { addBodyMetric(entry); imported++ }
-        }
-        showToast(`Imported ${imported} Renpho entries`)
-      } catch (err) {
-        showToast('Failed to parse CSV', 'error')
-      }
+      const result = detectAndParseCSV(ev.target.result)
+      setCsvPreview(result)
     }
     reader.readAsText(file)
     e.target.value = ''
+  }
+
+  function confirmImport() {
+    if (!csvPreview?.rows?.length) return
+    csvPreview.rows.forEach(row => {
+      // Map csvImport field names to app field names
+      addBodyMetric({
+        date: row.date,
+        weight: row.weight_lbs,
+        bodyFat: row.body_fat_pct,
+        visceralFat: row.visceral_fat,
+        muscleMass: row.muscle_mass_lbs,
+        waist: row.waist_inches,
+        neck: row.neck_inches,
+      })
+    })
+    showToast(`Imported ${csvPreview.rows.length} entries`)
+    setCsvPreview(null)
   }
 
   async function loadInsight() {
@@ -156,66 +154,120 @@ export function BodyMetrics({ state, addBodyMetric, today }) {
   return (
     <div className="px-4 py-4 pb-20 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl font-bold text-white tracking-wide">Body Metrics</h1>
+        <h1 className="font-heading text-2xl font-bold text-primary-color tracking-wide">Body Metrics</h1>
         <div className="flex gap-2">
-          <label className="flex items-center gap-1.5 bg-slate-700 text-slate-300 rounded-xl px-3 py-2 text-xs font-medium cursor-pointer hover:bg-slate-600">
-            <Upload size={14} className="text-blue-400" />
-            Renpho CSV
-            <input type="file" accept=".csv" onChange={importRenpho} className="hidden" />
+          <label className="flex items-center gap-1.5 btn-ghost rounded-xl px-3 py-2 text-xs font-medium cursor-pointer" style={{ fontSize: 12, padding: '8px 12px' }}>
+            <Upload size={14} style={{ color: 'var(--accent)' }} />
+            Import Any CSV
+            <input type="file" accept=".csv" onChange={handleCSVFile} className="hidden" />
           </label>
-          <button onClick={() => setShowCheckin(true)} className="flex items-center gap-1.5 bg-emerald-600 text-white rounded-xl px-3 py-2 text-xs font-medium">
+          <button onClick={() => setShowCheckin(true)} className="flex items-center gap-1.5 btn-primary rounded-xl px-3 py-2 text-xs font-medium">
             <Plus size={14} />
             Check-in
           </button>
         </div>
       </div>
 
+      {csvPreview && (
+        <div className="glass" style={{ padding: 16 }}>
+          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+            CSV Preview — {csvPreview.type !== 'unknown' ? csvPreview.type.replace('_', ' ') : 'Unknown format'}
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <span style={{ color: 'var(--accent)', fontSize: 14, fontWeight: 600 }}>
+              Found {csvPreview.rows?.length ?? 0} {(csvPreview.rows?.length ?? 0) === 1 ? 'entry' : 'entries'}
+            </span>
+          </div>
+          {csvPreview.rows?.length > 0 && csvPreview.rows[0] && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>Mapped fields:</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {Object.keys(csvPreview.rows[0]).filter(k => k !== 'raw_data' && csvPreview.rows[0][k] != null).map(k => (
+                  <span key={k} style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent)', color: 'var(--accent)', borderRadius: 6, padding: '2px 8px', fontSize: 11 }}>
+                    ✓ {k.replace(/_/g, ' ')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {csvPreview.unmappedColumns?.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>Unmapped (ignored):</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {csvPreview.unmappedColumns.map(c => (
+                  <span key={c} style={{ background: 'rgba(71,85,105,0.3)', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 11 }}>
+                    — {c}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={confirmImport}
+              disabled={!csvPreview.rows?.length}
+              className="btn-primary"
+              style={{ flex: 1, padding: '10px 0', fontSize: 13, cursor: !csvPreview.rows?.length ? 'not-allowed' : 'pointer', opacity: !csvPreview.rows?.length ? 0.5 : 1 }}
+            >
+              Import {csvPreview.rows?.length ?? 0} entries
+            </button>
+            <button
+              onClick={() => setCsvPreview(null)}
+              className="btn-ghost"
+              style={{ flex: 1, padding: '10px 0', fontSize: 13, cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Bio Age */}
-      <div className={`rounded-2xl p-4 flex items-center justify-between ${bioAge < 36 ? 'bg-emerald-500/15' : bioAge <= 40 ? 'bg-amber-500/15' : 'bg-red-500/15'}`}>
+      <div className={`glass rounded-2xl p-4 flex items-center justify-between ${bioAge < 36 ? 'bg-emerald-500/15' : bioAge <= 40 ? 'bg-amber-500/15' : 'bg-red-500/15'}`}>
         <div>
-          <div className="text-slate-400 text-xs uppercase font-heading tracking-widest">Functional Bio Age</div>
-          <div className={`font-heading text-5xl font-bold mt-1 ${bioAge < 36 ? 'text-emerald-400' : bioAge <= 40 ? 'text-amber-400' : 'text-red-400'}`}>{bioAge}</div>
-          <div className="text-slate-400 text-xs mt-1">Actual age: 36 · Target: &lt;30</div>
+          <div className="text-muted-color text-xs uppercase font-heading tracking-widest">Functional Bio Age</div>
+          <div className={`font-heading text-5xl font-bold mt-1 ${bioAge < 36 ? 'text-accent' : bioAge <= 40 ? 'text-amber-400' : 'text-red-400'}`}>{bioAge}</div>
+          <div className="text-muted-color text-xs mt-1">Actual age: {user?.actual_age ?? 36} · Target: &lt;30</div>
         </div>
         <div className="text-right">
-          <div className="text-slate-400 text-xs">Key drivers</div>
-          <div className="text-slate-300 text-xs mt-1">BF%, Visceral Fat,</div>
-          <div className="text-slate-300 text-xs">Inflammation, Sleep</div>
+          <div className="text-muted-color text-xs">Key drivers</div>
+          <div className="text-primary-color text-xs mt-1">BF%, Visceral Fat,</div>
+          <div className="text-primary-color text-xs">Inflammation, Sleep</div>
         </div>
       </div>
 
       {/* Latest stats */}
       <div className="grid grid-cols-2 gap-2">
-        <StatCard label="Weight" value={latest?.weight} unit=" lbs" target={TARGETS.weight} color={latest?.weight > 185 ? 'text-amber-400' : 'text-white'} />
-        <StatCard label="Body Fat" value={latest?.bodyFat} unit="%" target={TARGETS.bodyFat} color={latest?.bodyFat > 22 ? 'text-amber-400' : 'text-emerald-400'} />
+        <StatCard label="Weight" value={latest?.weight} unit=" lbs" target={TARGETS.weight} color={latest?.weight > 185 ? 'text-amber-400' : 'text-primary-color'} />
+        <StatCard label="Body Fat" value={latest?.bodyFat} unit="%" target={TARGETS.bodyFat} color={latest?.bodyFat > 22 ? 'text-amber-400' : 'text-accent'} />
         <StatCard label="Visceral Fat" value={latest?.visceralFat} unit="" target={TARGETS.visceralFat} color={latest?.visceralFat > 11 ? 'text-red-400' : 'text-amber-400'} />
         <StatCard label="Waist" value={latest?.waist} unit='"' target={null} />
       </div>
 
       {/* Weight chart */}
-      <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
-        <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">Weight Trend</h3>
+      <div className="glass p-4 space-y-3">
+        <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">Weight Trend</h3>
         <SVGChart data={weightData.slice(-20)} color="#10b981" label="Weight (lbs)" unit=" lbs" />
       </div>
 
       {/* BF chart */}
-      <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
-        <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">Body Fat Trend</h3>
+      <div className="glass p-4 space-y-3">
+        <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">Body Fat Trend</h3>
         <SVGChart data={bfData.slice(-20)} color="#3b82f6" label="Body Fat (%)" unit="%" />
       </div>
 
       {/* Projection */}
       {projection && (
-        <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
-          <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">16-Week Projection</h3>
-          <div className="text-slate-400 text-xs">Rate: {projection.weeklyRate > 0 ? '+' : ''}{projection.weeklyRate} lbs/week</div>
+        <div className="glass p-4 space-y-3">
+          <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">16-Week Projection</h3>
+          <div className="text-muted-color text-xs">Rate: {projection.weeklyRate > 0 ? '+' : ''}{projection.weeklyRate} lbs/week</div>
           <div className="grid grid-cols-3 gap-2">
             {projection.projections.map((p) => (
-              <div key={p.weeks} className="bg-slate-700 rounded-xl p-3 text-center">
-                <div className="text-slate-400 text-[10px] mb-1">Week {p.weeks}</div>
-                <div className="font-heading text-base font-bold text-white">{p.weight} lbs</div>
+              <div key={p.weeks} className="glass-elevated rounded-xl p-3 text-center">
+                <div className="text-muted-color text-[10px] mb-1">Week {p.weeks}</div>
+                <div className="font-heading text-base font-bold text-primary-color">{p.weight} lbs</div>
                 <div className="text-blue-400 text-xs">{p.bodyFat}% BF</div>
-                <div className="text-slate-500 text-[10px] mt-0.5">{p.date}</div>
+                <div className="text-muted-color text-[10px] mt-0.5">{p.date}</div>
               </div>
             ))}
           </div>
@@ -223,10 +275,10 @@ export function BodyMetrics({ state, addBodyMetric, today }) {
       )}
 
       {/* 16-week targets */}
-      <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
+      <div className="glass p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <Target size={14} className="text-emerald-400" />
-          <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">16-Week Targets</h3>
+          <Target size={14} className="text-accent" />
+          <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">16-Week Targets</h3>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           {[
@@ -235,28 +287,28 @@ export function BodyMetrics({ state, addBodyMetric, today }) {
             { label: 'Visceral Fat', target: '<9', current: latest?.visceralFat ?? '—' },
             { label: 'Bio Age', target: '<30', current: bioAge },
           ].map(({ label, target, current }) => (
-            <div key={label} className="bg-slate-700 rounded-xl p-3">
-              <div className="text-slate-400 text-xs">{label}</div>
-              <div className="text-white font-medium mt-0.5">{current}</div>
-              <div className="text-emerald-400 text-xs mt-0.5">→ {target}</div>
+            <div key={label} className="glass-elevated rounded-xl p-3">
+              <div className="text-muted-color text-xs">{label}</div>
+              <div className="text-primary-color font-medium mt-0.5">{current}</div>
+              <div className="text-accent text-xs mt-0.5">→ {target}</div>
             </div>
           ))}
         </div>
       </div>
 
       {/* AI analysis */}
-      <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
+      <div className="glass p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">AI Root Cause</h3>
-          <button onClick={loadInsight} disabled={loading} className="flex items-center gap-1.5 text-emerald-400 text-xs font-medium">
+          <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">AI Root Cause</h3>
+          <button onClick={loadInsight} disabled={loading} className="flex items-center gap-1.5 text-accent text-xs font-medium">
             {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             {loading ? 'Analyzing...' : 'Analyze'}
           </button>
         </div>
         {insight ? (
-          <p className="text-slate-300 text-sm leading-relaxed">{insight}</p>
+          <p className="text-primary-color text-sm leading-relaxed">{insight}</p>
         ) : (
-          <p className="text-slate-500 text-sm italic">Tap Analyze for body composition insights.</p>
+          <p className="text-muted-color text-sm italic">Tap Analyze for body composition insights.</p>
         )}
       </div>
 

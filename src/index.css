@@ -3,6 +3,25 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg-base: #020617;
+    --bg-surface: rgba(15, 23, 42, 0.75);
+    --bg-surface-hover: rgba(30, 41, 59, 0.90);
+    --bg-elevated: rgba(30, 41, 59, 0.55);
+    --border: rgba(148, 163, 184, 0.07);
+    --border-active: rgba(148, 163, 184, 0.18);
+    --accent: #6ee7b7;
+    --accent-dim: rgba(110, 231, 183, 0.10);
+    --accent-glow: 0 0 28px rgba(110, 231, 183, 0.18);
+    --red-dim: rgba(248, 113, 113, 0.12);
+    --amber-dim: rgba(251, 191, 36, 0.10);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #475569;
+    --radius: 18px;
+    --radius-sm: 12px;
+  }
+
   * {
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
@@ -18,6 +37,12 @@
 
   body {
     overflow-x: hidden;
+    background: var(--bg-base);
+    background-image: radial-gradient(
+      ellipse at 50% 0%,
+      rgba(110, 231, 183, 0.04) 0%,
+      transparent 55%
+    );
   }
 
   input[type=number]::-webkit-inner-spin-button,
@@ -44,4 +69,62 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  .glass {
+    background: var(--bg-surface);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .glass:hover {
+    background: var(--bg-surface-hover);
+    border-color: var(--border-active);
+  }
+
+  .glass-elevated {
+    background: var(--bg-elevated);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .btn-primary {
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: var(--radius-sm);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .btn-primary:hover {
+    box-shadow: var(--accent-glow);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--border-active);
+    color: var(--text-primary);
+  }
+
+  .accent-glow {
+    box-shadow: var(--accent-glow);
+  }
+
+  .text-accent { color: var(--accent); }
+  .text-primary-color { color: var(--text-primary); }
+  .text-secondary-color { color: var(--text-secondary); }
+  .text-muted-color { color: var(--text-muted); }
 }
