@@ -277,6 +277,121 @@ function ExerciseCard({ exercise, workoutLog, today, logSet, removeSet, state, i
   )
 }
 
+function ReadinessCard({ state, workout, today }) {
+  const [assessment, setAssessment] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const stiffness = state.morningStiffness[today] ?? null
+
+  // Inline inflam score calc to avoid circular import
+  const todayInflam = (() => {
+    const inf = state.inflam[today]
+    if (!inf) return null
+    let score = 3
+    if (inf.zone2) score -= 0.5
+    if (inf.salmon) score -= 0.5
+    if (inf.cold) score -= 0.5
+    if (inf.breathing) score -= 0.5
+    const sleep = inf.sleep ?? 7
+    if (sleep >= 8) score -= 0.5
+    else if (sleep < 6) score += 1
+    return Math.max(0, Math.min(5, score))
+  })()
+
+  // Last session summary for this workout type
+  const recentSets = Object.entries(state.workoutLog)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, 3)
+    .map(([date, exercises]) => {
+      const totalSets = Object.values(exercises).reduce((a, s) => a + s.length, 0)
+      return `${date}: ${totalSets} sets`
+    })
+
+  const VERDICT_STYLE = {
+    PUSH:      { bg: 'bg-emerald-500/15 border-emerald-500/40', badge: 'bg-emerald-500 text-white', icon: '🚀' },
+    MAINTAIN:  { bg: 'bg-amber-500/15 border-amber-500/40',   badge: 'bg-amber-500 text-white',   icon: '✅' },
+    BACK_OFF:  { bg: 'bg-red-500/15 border-red-500/40',       badge: 'bg-red-500 text-white',      icon: '⚠️' },
+  }
+
+  async function getAssessment() {
+    if (!state.apiKey) { showToast('Add API key in Settings', 'warn'); return }
+    setLoading(true)
+    try {
+      const context = `
+Today's workout: ${workout.name}
+Morning stiffness: ${stiffness !== null ? stiffness + '/5' : 'not logged'}
+Today's inflammation score: ${todayInflam !== null ? todayInflam.toFixed(1) + '/5' : 'not logged'}
+Recent session history: ${recentSets.length > 0 ? recentSets.join(', ') : 'no recent sessions'}
+`
+      const prompt = `Pre-session readiness assessment.
+
+${context}
+
+Based on this data, give me a readiness verdict and brief guidance. Your response MUST start with exactly one of these three words on the first line: PUSH, MAINTAIN, or BACK_OFF. Then on the next lines, give 2-3 sentences of specific guidance for today's session considering my L5-S1 condition and inflammation level. Be direct and actionable.`
+
+      const text = await getAIInsight(state.apiKey, prompt, state, today)
+
+      // Parse verdict from first line
+      const lines = text.trim().split('\n')
+      const firstWord = lines[0].trim().toUpperCase().replace(/[^A-Z_]/g, '')
+      const verdict = ['PUSH', 'MAINTAIN', 'BACK_OFF'].includes(firstWord) ? firstWord : 'MAINTAIN'
+      const guidance = lines.slice(1).join('\n').trim() || text
+
+      setAssessment({ verdict, guidance })
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const style = assessment ? VERDICT_STYLE[assessment.verdict] : null
+
+  return (
+    <div className={`rounded-2xl p-4 border space-y-3 transition-all ${style ? style.bg : 'bg-slate-800 border-slate-700'}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-base">{style?.icon ?? '🧠'}</span>
+          <h3 className="font-heading text-sm font-semibold text-white uppercase tracking-widest">Readiness Assessment</h3>
+        </div>
+        <button
+          onClick={getAssessment}
+          disabled={loading}
+          className="flex items-center gap-1.5 text-emerald-400 text-xs font-medium"
+        >
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          {loading ? 'Assessing...' : assessment ? 'Refresh' : 'Assess'}
+        </button>
+      </div>
+
+      {/* Input signals */}
+      <div className="flex gap-2 flex-wrap">
+        <span className={`text-[10px] px-2 py-1 rounded-full font-medium ${stiffness === null ? 'bg-slate-700 text-slate-400' : stiffness >= 4 ? 'bg-red-500/20 text-red-300' : stiffness >= 3 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+          Stiffness: {stiffness !== null ? `${stiffness}/5` : '—'}
+        </span>
+        <span className={`text-[10px] px-2 py-1 rounded-full font-medium ${todayInflam === null ? 'bg-slate-700 text-slate-400' : todayInflam >= 4 ? 'bg-red-500/20 text-red-300' : todayInflam >= 2.5 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+          Inflammation: {todayInflam !== null ? `${todayInflam.toFixed(1)}/5` : '—'}
+        </span>
+        <span className="text-[10px] px-2 py-1 rounded-full bg-slate-700 text-slate-400 font-medium">
+          Sessions: {recentSets.length > 0 ? recentSets.length + ' recent' : 'no data'}
+        </span>
+      </div>
+
+      {/* Verdict */}
+      {assessment ? (
+        <div className="space-y-2">
+          <span className={`inline-block text-xs font-bold font-heading px-3 py-1 rounded-full tracking-wider ${style.badge}`}>
+            {assessment.verdict.replace('_', ' ')}
+          </span>
+          <p className="text-slate-200 text-sm leading-relaxed">{assessment.guidance}</p>
+        </div>
+      ) : (
+        <p className="text-slate-500 text-xs italic">Tap Assess to get a push/maintain/back-off verdict based on your stiffness, inflammation, and recent sessions.</p>
+      )}
+    </div>
+  )
+}
+
 export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, today }) {
   const [showSwap, setShowSwap] = useState(false)
   const [showWarmup, setShowWarmup] = useState(false)
@@ -306,6 +421,9 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
           Done
         </button>
       </div>
+
+      {/* Pre-session readiness assessment */}
+      <ReadinessCard state={state} workout={workout} today={today} />
 
       {/* Stiffness alert */}
       {stiffness >= 4 && (
