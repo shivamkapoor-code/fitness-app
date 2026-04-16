@@ -2,9 +2,18 @@ import { useState } from 'react'
 import { Eye, EyeOff, Download, Upload, Key, Info, Smartphone } from 'lucide-react'
 import { showToast } from '../utils/toast'
 
+const ENV_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY ?? ''
+
 export function Settings({ state, update }) {
   const [keyInput, setKeyInput] = useState(state.apiKey ?? '')
   const [showKey, setShowKey] = useState(false)
+
+  const effectiveKey = state.apiKey || ENV_KEY
+  const keySource = state.apiKey
+    ? 'Saved in app'
+    : ENV_KEY
+    ? 'Loaded from environment'
+    : null
 
   function saveKey() {
     update({ apiKey: keyInput.trim() })
@@ -12,9 +21,10 @@ export function Settings({ state, update }) {
   }
 
   function removeKey() {
+    // Fall back to env var rather than writing empty string to localStorage
     setKeyInput('')
-    update({ apiKey: '' })
-    showToast('API key removed')
+    update({ apiKey: ENV_KEY })
+    showToast(ENV_KEY ? 'Custom key removed — using environment key' : 'API key removed')
   }
 
   function exportData() {
@@ -80,8 +90,12 @@ export function Settings({ state, update }) {
           <button onClick={removeKey} className="px-4 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl py-2 text-sm font-medium">Remove</button>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${state.apiKey ? 'bg-emerald-400' : 'bg-red-400'}`} />
-          <span className="text-slate-400 text-xs">{state.apiKey ? 'API key configured' : 'No API key — AI features disabled'}</span>
+          <div className={`w-2 h-2 rounded-full ${effectiveKey ? 'bg-emerald-400' : 'bg-red-400'}`} />
+          <span className="text-slate-400 text-xs">
+            {effectiveKey
+              ? `AI ready · ${keySource}`
+              : 'No API key — AI features disabled'}
+          </span>
         </div>
       </div>
 

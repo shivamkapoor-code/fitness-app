@@ -24,7 +24,7 @@ function getInitialState() {
     inflam: saved?.inflam ?? {},
     workoutQueue: saved?.workoutQueue ?? defaultQueue,
     morningStiffness: saved?.morningStiffness ?? {},
-    apiKey: saved?.apiKey ?? (import.meta.env.VITE_ANTHROPIC_API_KEY ?? ''),
+    apiKey: saved?.apiKey || (import.meta.env.VITE_ANTHROPIC_API_KEY ?? ''),
     chatHistory: [],
   }
 }
