@@ -8,6 +8,15 @@ export function Modal({ open, onClose, title, children, fullScreen = false }) {
     return () => { document.body.style.overflow = '' }
   }, [open])
 
+  useEffect(() => {
+    if (!open) return
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [open, onClose])
+
   if (!open) return null
 
   return (
@@ -21,7 +30,7 @@ export function Modal({ open, onClose, title, children, fullScreen = false }) {
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 flex-shrink-0">
           <h2 className="font-heading text-lg font-semibold text-white tracking-wide">{title}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400">
+          <button onClick={onClose} aria-label="Close modal" className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400">
             <X size={18} />
           </button>
         </div>

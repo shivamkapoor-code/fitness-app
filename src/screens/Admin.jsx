@@ -1,6 +1,26 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { Download, Users, Activity, ChevronRight, ArrowLeft } from 'lucide-react'
+import { Download, Users, Activity, ChevronRight } from 'lucide-react'
+
+function normaliseMetrics(metrics = []) {
+  return metrics.map((metric) => ({
+    date: metric.date,
+    weight_lbs: metric.weight_lbs ?? metric.weight,
+    body_fat_pct: metric.body_fat_pct ?? metric.bodyFat,
+    visceral_fat: metric.visceral_fat ?? metric.visceralFat,
+    muscle_mass_lbs: metric.muscle_mass_lbs ?? metric.muscleMass,
+    bmr: metric.bmr,
+    metabolic_age: metric.metabolic_age ?? metric.metabolicAge,
+    waist_inches: metric.waist_inches ?? metric.waist,
+    neck_inches: metric.neck_inches ?? metric.neck,
+  })).filter((metric) => metric.date).sort((a, b) => a.date.localeCompare(b.date))
+}
+
+function countWorkoutSets(workoutLog = {}) {
+  return Object.values(workoutLog).reduce((total, day) => (
+    total + Object.values(day ?? {}).reduce((dayTotal, sets) => dayTotal + (sets?.length ?? 0), 0)
+  ), 0)
+}
 
 function calcBioAgeSimple(metrics) {
   if (!metrics || metrics.length === 0) return null
@@ -47,17 +67,22 @@ export function Admin({ isAdmin, onNavigate }) {
   }, [isAdmin])
 
   async function fetchStats() {
+    if (!supabase) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const [profilesRes, metricsRes, workoutsRes] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact' }),
-        supabase.from('body_metrics').select('*', { count: 'exact', head: true }),
-        supabase.from('workout_logs').select('*', { count: 'exact', head: true }),
+        supabase.from('app_state').select('state_json'),
+        supabase.from('app_state').select('state_json'),
       ])
+      const appStates = metricsRes.data ?? []
       setStats({
         users: profilesRes.count ?? 0,
-        metrics: metricsRes.count ?? 0,
-        workouts: workoutsRes.count ?? 0,
+        metrics: appStates.reduce((sum, row) => sum + (row.state_json?.bodyMetrics?.length ?? 0), 0),
+        workouts: (workoutsRes.data ?? []).reduce((sum, row) => sum + countWorkoutSets(row.state_json?.workoutLog), 0),
       })
       setUsers(profilesRes.data ?? [])
     } catch (e) {
@@ -69,12 +94,18 @@ export function Admin({ isAdmin, onNavigate }) {
 
   async function viewUser(user) {
     setSelectedUser(user)
-    const [metricsRes, workoutsRes] = await Promise.all([
-      supabase.from('body_metrics').select('*').eq('user_id', user.id).order('date'),
-      supabase.from('workout_logs').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
-    ])
-    setUserMetrics(metricsRes.data ?? [])
-    setUserWorkoutCount(workoutsRes.count ?? 0)
+    if (!supabase) return
+    const { data, error } = await supabase
+      .from('app_state')
+      .select('state_json')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (error) {
+      console.error('Admin app state fetch error:', error)
+      return
+    }
+    setUserMetrics(normaliseMetrics(data?.state_json?.bodyMetrics ?? []))
+    setUserWorkoutCount(countWorkoutSets(data?.state_json?.workoutLog))
   }
 
   if (!isAdmin) {
@@ -115,7 +146,7 @@ export function Admin({ isAdmin, onNavigate }) {
               { label: 'Username', val: selectedUser.username },
               { label: 'Actual Age', val: selectedUser.actual_age ?? '—' },
               { label: 'Joined', val: new Date(selectedUser.created_at).toLocaleDateString() },
-              { label: 'Last Active', val: new Date(selectedUser.last_active).toLocaleDateString() },
+              { label: 'Updated', val: new Date(selectedUser.updated_at).toLocaleDateString() },
             ].map(({ label, val }) => (
               <div key={label} className="glass-elevated" style={{ padding: '10px 12px' }}>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{label}</div>
@@ -219,7 +250,7 @@ export function Admin({ isAdmin, onNavigate }) {
                       {u.is_admin && <span style={{ background: 'var(--accent-dim)', color: 'var(--accent)', borderRadius: 4, padding: '1px 5px', fontSize: 9, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700 }}>ADMIN</span>}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                      @{u.username} · Active {new Date(u.last_active).toLocaleDateString()}
+                      @{u.username} · Updated {new Date(u.updated_at).toLocaleDateString()}
                     </div>
                   </div>
                   <ChevronRight size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />

@@ -26,7 +26,6 @@ export function Dashboard({ state, setStiffness, today, onNavigate, user }) {
 
   // Inflammation score
   const todayInflam = calcInflamScore(state.inflam[today])
-  const inflamScoreInt = Math.round(todayInflam)
   const inflam7 = []
   for (let i = 6; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i)
@@ -57,11 +56,9 @@ export function Dashboard({ state, setStiffness, today, onNavigate, user }) {
   const remFat = tFat - (todayNutrition.fat ?? 0)
 
   async function loadInsight() {
-    if (!state.apiKey) { showToast('Add API key in Settings', 'warn'); return }
     setLoadingInsight(true)
     try {
       const text = await getAIInsight(
-        state.apiKey,
         `Give me one specific, actionable insight for today based on my current data. Focus on the single highest-leverage action I can take right now. 2-3 sentences max. Be specific and direct.`,
         state,
         today
@@ -93,7 +90,9 @@ export function Dashboard({ state, setStiffness, today, onNavigate, user }) {
           <div className={`font-heading text-lg font-bold ${bioAge < 36 ? 'text-emerald-400' : bioAge <= 40 ? 'text-amber-400' : 'text-red-400'}`}>
             Bio Age {bioAge}
           </div>
-          <div className="text-slate-500 text-[10px]">vs actual 36</div>
+          <div className="text-slate-500 text-[10px]">
+            {user?.actual_age ? `vs actual ${user.actual_age}` : 'set age in Settings'}
+          </div>
         </div>
       </div>
 

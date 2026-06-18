@@ -24,7 +24,6 @@ export function AIChat({ state, addChatMessage, today }) {
   async function send(text) {
     const msg = (text ?? input).trim()
     if (!msg) return
-    if (!state.apiKey) { showToast('Add API key in Settings', 'warn'); return }
 
     setInput('')
     addChatMessage({ role: 'user', content: msg, ts: Date.now() })
@@ -39,7 +38,7 @@ export function AIChat({ state, addChatMessage, today }) {
 
       history.push({ role: 'user', content: msg })
 
-      const reply = await callClaude(state.apiKey, history, context)
+      const reply = await callClaude(history, context)
       addChatMessage({ role: 'assistant', content: reply, ts: Date.now() })
     } catch (e) {
       showToast(e.message, 'error')

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { supabase } from '../lib/supabase'
 
 const STORAGE_KEY = 'shivam_fitness_v1'
 
@@ -16,6 +17,10 @@ function loadState() {
 
 function getInitialState() {
   const saved = loadState()
+  return normaliseState(saved)
+}
+
+function normaliseState(saved) {
   return {
     workoutLog: saved?.workoutLog ?? {},
     nutrition: saved?.nutrition ?? {},
@@ -24,17 +29,90 @@ function getInitialState() {
     inflam: saved?.inflam ?? {},
     workoutQueue: saved?.workoutQueue ?? defaultQueue,
     morningStiffness: saved?.morningStiffness ?? {},
-    apiKey: saved?.apiKey || (import.meta.env.VITE_ANTHROPIC_API_KEY ?? ''),
     chatHistory: [],
   }
 }
 
-export function useAppState() {
+export function useAppState(userId) {
   const [state, setState] = useState(getInitialState)
+  const [loading, setLoading] = useState(false)
+  const remoteReadyRef = useRef(false)
+  const userIdRef = useRef(null)
+  const stateRef = useRef(state)
 
   useEffect(() => {
-    const { chatHistory, ...persist } = state
+    stateRef.current = state
+  }, [state])
+
+  const loadRemoteState = useCallback(async (userId) => {
+    if (!supabase || !userId) return
+    setLoading(true)
+    remoteReadyRef.current = false
+    userIdRef.current = userId
+
+    const { data, error } = await supabase
+      .from('app_state')
+      .select('state_json')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (userIdRef.current !== userId) return
+
+    if (error) {
+      console.error('Failed to load app state:', error)
+    } else if (data?.state_json) {
+      setState(normaliseState(data.state_json))
+    } else {
+      const persist = { ...stateRef.current }
+      delete persist.chatHistory
+      const { error: saveError } = await supabase
+        .from('app_state')
+        .upsert({
+          user_id: userId,
+          state_json: persist,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+      if (saveError) console.error('Failed to initialise app state:', saveError)
+    }
+
+    remoteReadyRef.current = true
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    if (userId) Promise.resolve().then(() => loadRemoteState(userId))
+    else {
+      userIdRef.current = null
+      remoteReadyRef.current = false
+    }
+  }, [userId, loadRemoteState])
+
+  useEffect(() => {
+    return () => {
+      userIdRef.current = null
+      remoteReadyRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const persist = { ...state }
+    delete persist.chatHistory
     localStorage.setItem(STORAGE_KEY, JSON.stringify(persist))
+    if (!supabase || !userIdRef.current || !remoteReadyRef.current) return undefined
+
+    const timeout = setTimeout(async () => {
+      const { error } = await supabase
+        .from('app_state')
+        .upsert({
+          user_id: userIdRef.current,
+          state_json: persist,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+
+      if (error) console.error('Failed to save app state:', error)
+    }, 500)
+
+    return () => clearTimeout(timeout)
   }, [state])
 
   const update = useCallback((patch) => {
@@ -186,6 +264,8 @@ export function useAppState() {
 
   return {
     state,
+    loading,
+    loadRemoteState,
     update,
     today,
     logSet,

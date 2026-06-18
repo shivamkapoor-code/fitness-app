@@ -130,12 +130,10 @@ export function BodyMetrics({ state, addBodyMetric, today, user }) {
   }
 
   async function loadInsight() {
-    if (!state.apiKey) { showToast('Add API key in Settings', 'warn'); return }
     setLoading(true)
     try {
       const latestStr = latest ? `Current: ${latest.weight}lbs, ${latest.bodyFat}% BF, visceral fat ${latest.visceralFat}` : 'No measurements yet'
       const text = await getAIInsight(
-        state.apiKey,
         `${latestStr}. Biological age: ${bioAge}. Target: 175lbs, 15% BF, visceral fat <9. Give me root cause analysis of my current body composition and the most important intervention to reach my targets. 3-4 sentences, specific and actionable.`,
         state,
         today
@@ -227,7 +225,7 @@ export function BodyMetrics({ state, addBodyMetric, today, user }) {
         <div>
           <div className="text-muted-color text-xs uppercase font-heading tracking-widest">Functional Bio Age</div>
           <div className={`font-heading text-5xl font-bold mt-1 ${bioAge < 36 ? 'text-accent' : bioAge <= 40 ? 'text-amber-400' : 'text-red-400'}`}>{bioAge}</div>
-          <div className="text-muted-color text-xs mt-1">Actual age: {user?.actual_age ?? 36} · Target: &lt;30</div>
+          <div className="text-muted-color text-xs mt-1">Actual age: {user?.actual_age ?? 'Set in Settings'} · Target: &lt;30</div>
         </div>
         <div className="text-right">
           <div className="text-muted-color text-xs">Key drivers</div>

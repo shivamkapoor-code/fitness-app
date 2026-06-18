@@ -1,27 +1,4 @@
-const SHIVAM_PROFILE = `You are simultaneously an expert nutritionist, bodybuilder, biochemist, and physiotherapist. You are Shivam's personal coach with intimate knowledge of his profile.
-
-SHIVAM'S STATS:
-- Current: 192lb, 23.7% body fat, visceral fat 11, metabolic age 36, BMR 1804 kcal
-- Targets: 175lb, 15% BF, visceral fat <9, metabolic age <30
-- Lean mass: 146.4lb (MUST protect — minimum 144lb)
-
-CRITICAL MEDICAL CONDITIONS (non-negotiable):
-- L5-S1 disc injury: NO spinal flexion under load ever
-- Piriformis syndrome: NO hip external rotation under load, NO wide stance, NO hip abduction machine
-- Sciatica: burning/tingling down leg = stop immediately
-- Tight hamstrings & glutes: NO RDL, NO cable pull-through
-- Desk job: thoracic stiffness — needs daily mobility
-
-REMOVED EXERCISES (never suggest): DB RDL, Bulgarian Split Squats, Dips, Hip Abduction Machine, 90/90 Hip Switches, Pigeon Pose, Cable Pull-Through
-
-NUTRITION TARGETS: 2200 kcal, 185g protein (FIXED), 220g carbs (adjust first), 62g fat, 14-day adjustment rule
-ANTI-INFLAMMATORY PRIORITY: Wild salmon 3-4x/week, turmeric+black pepper, EVOO, blueberries, oats
-
-GYM: LA Fitness Hurontario — Hack Squat, Leg Press, Hip Thrust Machine, all cables, Ab Wheel, Farmer Carry space, all dumbbells
-
-GOAL: Look muscular and fit (NOT bodybuilder bulk), reduce inflammation, improve metabolic age, reach 15% BF preserving lean mass
-
-Always give specific, actionable advice. Reference his conditions when relevant. Be direct, not generic.`
+import { supabase } from '../lib/supabase'
 
 export function buildContext(state, today) {
   const last7Days = []
@@ -64,7 +41,6 @@ export function buildContext(state, today) {
 
   const queue = state.workoutQueue
   const todayWorkoutDay = queue.seq[queue.idx]
-
   const workoutNames = ['Full Rest', 'PUSH Strength', 'PULL Strength', 'LEGS Strength', 'Recovery Mobility', 'UPPER Hypertrophy', 'LEGS Hypertrophy']
 
   return `
@@ -80,78 +56,25 @@ CURRENT DATA (${today}):
 - Today's macros so far: ${todayNutrition.kcal} kcal, ${todayNutrition.protein}g protein, ${todayNutrition.carbs}g carbs, ${todayNutrition.fat}g fat`
 }
 
-export async function callClaude(apiKey, messages, contextStr = '') {
-  if (!apiKey) throw new Error('No API key set. Add your Anthropic API key in Settings.')
-
-  const systemPrompt = SHIVAM_PROFILE + (contextStr ? '\n\n' + contextStr : '')
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages,
-    }),
-  })
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}))
-    throw new Error(err?.error?.message ?? `API error ${response.status}`)
-  }
-
-  const data = await response.json()
-  return data.content[0]?.text ?? ''
+async function invokeCoach(body) {
+  if (!supabase) throw new Error('Supabase is not configured. AI features need Supabase Edge Functions.')
+  const { data, error } = await supabase.functions.invoke('ai-coach', { body })
+  if (error) throw new Error(error.message)
+  if (data?.error) throw new Error(data.error)
+  return data
 }
 
-export async function getAIInsight(apiKey, prompt, state, today) {
+export async function callClaude(messages, contextStr = '') {
+  const data = await invokeCoach({ action: 'chat', messages, context: contextStr })
+  return data.text ?? ''
+}
+
+export async function getAIInsight(prompt, state, today) {
   const context = buildContext(state, today)
-  return callClaude(apiKey, [{ role: 'user', content: prompt }], context)
+  return callClaude([{ role: 'user', content: prompt }], context)
 }
 
-export async function analyzePhoto(apiKey, base64Image, mediaType = 'image/jpeg') {
-  if (!apiKey) throw new Error('No API key set.')
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 512,
-      system: 'You are a nutrition analyst. Estimate macros for food photos. Return JSON: { name, kcal, protein, carbs, fat, confidence: "high"|"medium"|"low", notes }',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Image } },
-            { type: 'text', text: 'Estimate the macros for this meal. Return only valid JSON.' },
-          ],
-        },
-      ],
-    }),
-  })
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}))
-    throw new Error(err?.error?.message ?? `API error ${response.status}`)
-  }
-
-  const data = await response.json()
-  const text = data.content[0]?.text ?? '{}'
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    return JSON.parse(jsonMatch ? jsonMatch[0] : text)
-  } catch {
-    return { name: 'Unknown meal', kcal: 0, protein: 0, carbs: 0, fat: 0, confidence: 'low', notes: text }
-  }
+export async function analyzePhoto(base64Image, mediaType = 'image/jpeg') {
+  const data = await invokeCoach({ action: 'photo', base64Image, mediaType })
+  return data.meal ?? { name: 'Unknown meal', kcal: 0, protein: 0, carbs: 0, fat: 0, confidence: 'low', notes: '' }
 }

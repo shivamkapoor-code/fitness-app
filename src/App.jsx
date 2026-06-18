@@ -1,9 +1,7 @@
 import { useState } from 'react'
-import { useAuth } from './hooks/useAuth'
 import { useAppState } from './hooks/useAppState'
 import { BottomNav } from './components/BottomNav'
 import { ToastContainer } from './components/Toast'
-import { Auth } from './screens/Auth'
 import { Admin } from './screens/Admin'
 import { Dashboard } from './screens/Dashboard'
 import { Workout } from './screens/Workout'
@@ -15,12 +13,29 @@ import { AIChat } from './screens/AIChat'
 import { WeeklyReview } from './screens/WeeklyReview'
 import { Settings } from './screens/Settings'
 
+const PROFILE_STORAGE_KEY = 'shivam_profile_v1'
+const DEFAULT_PROFILE = {
+  display_name: 'Shivam',
+  username: 'shivam',
+  actual_age: null,
+}
+
+function loadProfile() {
+  try {
+    const raw = localStorage.getItem(PROFILE_STORAGE_KEY)
+    return raw ? { ...DEFAULT_PROFILE, ...JSON.parse(raw) } : DEFAULT_PROFILE
+  } catch {
+    return DEFAULT_PROFILE
+  }
+}
+
 export default function App() {
-  const { user, loading, isAdmin, signOut, updateProfile } = useAuth()
   const [screen, setScreen] = useState('dashboard')
+  const [activeUser, setActiveUser] = useState(loadProfile)
+  const isAdmin = false
 
   const {
-    state, update, today,
+    state, loading: stateLoading, update, today,
     logSet, removeSet,
     addMeal, removeMeal,
     addBodyMetric,
@@ -28,9 +43,16 @@ export default function App() {
     setStiffness,
     advanceQueue, swapQueueDay,
     addChatMessage,
-  } = useAppState()
+  } = useAppState(null)
 
-  if (loading) {
+  function updateProfile(patch) {
+    const nextProfile = { ...activeUser, ...patch }
+    setActiveUser(nextProfile)
+    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(nextProfile))
+    return nextProfile
+  }
+
+  if (stateLoading) {
     return (
       <div style={{
         minHeight: '100dvh',
@@ -61,13 +83,11 @@ export default function App() {
     )
   }
 
-  if (!user) return <Auth />
-
   function renderScreen() {
     switch (screen) {
       case 'dashboard':
         return <Dashboard state={state} setStiffness={setStiffness}
-                 today={today} onNavigate={setScreen} user={user} />
+                 today={today} onNavigate={setScreen} user={activeUser} />
       case 'workout':
         return <Workout state={state} logSet={logSet} removeSet={removeSet}
                  advanceQueue={advanceQueue} swapQueueDay={swapQueueDay} today={today} />
@@ -76,7 +96,7 @@ export default function App() {
                  removeMeal={removeMeal} today={today} />
       case 'body':
         return <BodyMetrics state={state} addBodyMetric={addBodyMetric}
-                 today={today} user={user} />
+                 today={today} user={activeUser} />
       case 'supplements':
         return <Supplements state={state} toggleSupp={toggleSupp} today={today} />
       case 'inflammation':
@@ -86,14 +106,14 @@ export default function App() {
       case 'review':
         return <WeeklyReview state={state} today={today} />
       case 'settings':
-        return <Settings state={state} update={update} user={user}
-                 updateProfile={updateProfile} signOut={signOut}
+        return <Settings state={state} update={update} user={activeUser}
+                 updateProfile={updateProfile}
                  isAdmin={isAdmin} onNavigate={setScreen} />
       case 'admin':
         return <Admin isAdmin={isAdmin} onNavigate={setScreen} />
       default:
         return <Dashboard state={state} setStiffness={setStiffness}
-                 today={today} onNavigate={setScreen} user={user} />
+                 today={today} onNavigate={setScreen} user={activeUser} />
     }
   }
 

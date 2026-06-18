@@ -14,11 +14,9 @@ export function Supplements({ state, toggleSupp, today }) {
   const [loading, setLoading] = useState(false)
 
   async function loadInsight() {
-    if (!state.apiKey) { showToast('Add API key in Settings', 'warn'); return }
     setLoading(true)
     try {
       const text = await getAIInsight(
-        state.apiKey,
         `Based on my supplement stack and current data, give me a brief (3-4 sentence) insight about timing optimization or any synergies/conflicts I should know about today. Be specific to my inflammation and training day.`,
         state,
         today

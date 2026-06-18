@@ -44,11 +44,9 @@ export function Inflammation({ state, saveInflam, today }) {
     : null
 
   async function loadInsight() {
-    if (!state.apiKey) { showToast('Add API key in Settings', 'warn'); return }
     setLoading(true)
     try {
       const text = await getAIInsight(
-        state.apiKey,
         `Analyze my inflammation patterns. My current score is ${score.toFixed(1)}/5. Give me 3-4 sentences identifying the root cause of my inflammation and the single most impactful action I can take this week. Be specific to my L5-S1 condition and training load.`,
         state,
         today

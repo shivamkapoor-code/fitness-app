@@ -5,7 +5,10 @@ export function ToastContainer() {
   const [toasts, setToasts] = useState([])
 
   const addToast = useCallback(({ message, type, id }) => {
-    setToasts((prev) => [...prev, { message, type, id }])
+    setToasts((prev) => [
+      ...prev.filter((t) => t.message !== message || t.type !== type),
+      { message, type, id },
+    ])
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id))
     }, 3000)

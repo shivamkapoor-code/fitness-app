@@ -53,11 +53,9 @@ function ExerciseCard({ exercise, workoutLog, today, logSet, removeSet, state, i
   }
 
   async function getAIReplacement() {
-    if (!state.apiKey) { showToast('Add API key in Settings', 'warn'); return }
     setLoadingReplace(true)
     try {
       const text = await getAIInsight(
-        state.apiKey,
         `I need to replace "${exercise.name}" today. Consider my L5-S1 disc injury, piriformis syndrome, and the gym equipment available at LA Fitness Hurontario. Suggest ONE alternative exercise that hits the same muscle group safely. Give the exercise name and brief reasoning in 2 sentences.`,
         state,
         today
@@ -314,7 +312,6 @@ function ReadinessCard({ state, workout, today }) {
   }
 
   async function getAssessment() {
-    if (!state.apiKey) { showToast('Add API key in Settings', 'warn'); return }
     setLoading(true)
     try {
       const context = `
@@ -329,7 +326,7 @@ ${context}
 
 Based on this data, give me a readiness verdict and brief guidance. Your response MUST start with exactly one of these three words on the first line: PUSH, MAINTAIN, or BACK_OFF. Then on the next lines, give 2-3 sentences of specific guidance for today's session considering my L5-S1 condition and inflammation level. Be direct and actionable.`
 
-      const text = await getAIInsight(state.apiKey, prompt, state, today)
+      const text = await getAIInsight(prompt, state, today)
 
       // Parse verdict from first line
       const lines = text.trim().split('\n')

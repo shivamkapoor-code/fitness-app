@@ -23,12 +23,13 @@ export function BottomNav({ active, onNavigate }) {
       zIndex: 30,
     }}>
       <div className="flex">
-        {TABS.map(({ id, label, Icon }) => {
-          const isActive = active === id
+        {TABS.map((tab) => {
+          const isActive = active === tab.id
+          const Icon = tab.Icon
           return (
             <button
-              key={id}
-              onClick={() => onNavigate(id)}
+              key={tab.id}
+              onClick={() => onNavigate(tab.id)}
               style={{
                 flex: 1,
                 display: 'flex',
@@ -62,7 +63,7 @@ export function BottomNav({ active, onNavigate }) {
                 fontWeight: 600,
                 letterSpacing: '0.07em',
                 textTransform: 'uppercase',
-              }}>{label}</span>
+              }}>{tab.label}</span>
             </button>
           )
         })}

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Plus, Trash2, Camera, Barcode, PenLine, BookOpen, Loader2, RefreshCw, X } from 'lucide-react'
+import { Plus, Trash2, Camera, Barcode, PenLine, BookOpen, Loader2, RefreshCw } from 'lucide-react'
 import { MacroRings } from '../components/MacroRings'
 import { Modal } from '../components/Modal'
 import { MEALS, MACRO_TARGETS } from '../data/meals'
@@ -48,7 +48,6 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
   async function handlePhotoUpload(e) {
     const file = e.target.files[0]
     if (!file) return
-    if (!state.apiKey) { showToast('Add API key in Settings', 'warn'); return }
     setPhotoLoading(true)
     try {
       const reader = new FileReader()
@@ -56,7 +55,7 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
         const base64 = ev.target.result.split(',')[1]
         const mediaType = file.type
         try {
-          const result = await analyzePhoto(state.apiKey, base64, mediaType)
+          const result = await analyzePhoto(base64, mediaType)
           addMeal(today, {
             id: `photo_${Date.now()}`,
             name: result.name ?? 'Photo meal',
@@ -98,7 +97,6 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
               if (data.status === 1) {
                 const p = data.product
                 const nutrients = p.nutriments ?? {}
-                const servingG = parseFloat(nutrients['serving_size']) || 100
                 addMeal(today, {
                   id: `barcode_${Date.now()}`,
                   name: p.product_name ?? 'Scanned product',
@@ -116,7 +114,7 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
             }
           }
         })
-      } catch (e) {
+      } catch {
         showToast('Camera access denied', 'error')
         setShowBarcode(false)
       }
@@ -129,11 +127,9 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
   }
 
   async function loadAICoach() {
-    if (!state.apiKey) { showToast('Add API key in Settings', 'warn'); return }
     setLoadingAI(true)
     try {
       const text = await getAIInsight(
-        state.apiKey,
         `Review my nutrition today and give me specific feedback. What am I missing? What should my next meal or snack be right now? Factor in my training day and inflammation goals. 3-4 sentences.`,
         state,
         today
@@ -182,12 +178,14 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
           { icon: Camera, label: 'AI Photo', color: 'text-blue-400', action: () => photoRef.current?.click(), loading: photoLoading },
           { icon: Barcode, label: 'Barcode', color: 'text-purple-400', action: startBarcode },
           { icon: PenLine, label: 'Manual', color: 'text-amber-400', action: () => setShowManual(true) },
-        ].map(({ icon: Icon, label, color, action, loading }) => (
-          <button key={label} onClick={action} disabled={loading} className="bg-slate-800 rounded-xl p-3 flex flex-col items-center gap-1.5 hover:bg-slate-700 transition-colors">
-            {loading ? <Loader2 size={20} className={`${color} animate-spin`} /> : <Icon size={20} className={color} />}
-            <span className="text-slate-300 text-[10px] font-medium">{label}</span>
+        ].map((actionItem) => {
+          const Icon = actionItem.icon
+          return (
+          <button key={actionItem.label} onClick={actionItem.action} disabled={actionItem.loading} className="bg-slate-800 rounded-xl p-3 flex flex-col items-center gap-1.5 hover:bg-slate-700 transition-colors">
+            {actionItem.loading ? <Loader2 size={20} className={`${actionItem.color} animate-spin`} /> : <Icon size={20} className={actionItem.color} />}
+            <span className="text-slate-300 text-[10px] font-medium">{actionItem.label}</span>
           </button>
-        ))}
+        )})}
       </div>
       <input ref={photoRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload} className="hidden" />
 

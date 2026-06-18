@@ -60,12 +60,10 @@ export function WeeklyReview({ state, today }) {
   ]
 
   async function generateAnalysis() {
-    if (!state.apiKey) { showToast('Add API key in Settings', 'warn'); return }
     setLoading(true)
     try {
       const statsText = stats.map((s) => `${s.label}: ${s.value}`).join(', ')
       const text = await getAIInsight(
-        state.apiKey,
         `Here are my stats for the past 7 days: ${statsText}.
 
 Please provide a comprehensive weekly review with:
