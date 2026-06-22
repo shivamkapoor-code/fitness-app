@@ -4,6 +4,9 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+const ANTHROPIC_MODEL = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-4-6'
+const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
 const SHIVAM_PROFILE = `You are simultaneously an expert nutritionist, bodybuilder, biochemist, and physiotherapist. You are Shivam's personal coach with intimate knowledge of his profile.
 
 SHIVAM'S STATS:
@@ -32,23 +35,34 @@ Deno.serve(async (req) => {
 
   try {
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not configured on the Edge Function.')
+    if (!apiKey) {
+      return jsonError('ANTHROPIC_API_KEY is not configured on the Edge Function.', 500)
+    }
 
     const body = await req.json()
     const response = body.action === 'photo'
       ? await analyzePhoto(apiKey, body.base64Image, body.mediaType)
-      : await chat(apiKey, body.messages, body.context)
+      : body.action === 'chat'
+        ? await chat(apiKey, body.messages, body.context)
+        : null
+
+    if (!response) return jsonError('Unknown AI coach action.', 400)
 
     return Response.json(response, { headers: corsHeaders })
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : 'AI request failed' },
-      { status: 400, headers: corsHeaders },
-    )
+    return jsonError(error instanceof Error ? error.message : 'AI request failed', 400)
   }
 })
 
+function jsonError(message: string, status: number) {
+  return Response.json({ error: message }, { status, headers: corsHeaders })
+}
+
 async function chat(apiKey: string, messages: Array<{ role: string; content: string }>, context = '') {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw new Error('Chat request is missing messages.')
+  }
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -57,7 +71,7 @@ async function chat(apiKey: string, messages: Array<{ role: string; content: str
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: ANTHROPIC_MODEL,
       max_tokens: 1024,
       system: SHIVAM_PROFILE + (context ? `\n\n${context}` : ''),
       messages,
@@ -74,6 +88,12 @@ async function chat(apiKey: string, messages: Array<{ role: string; content: str
 }
 
 async function analyzePhoto(apiKey: string, base64Image: string, mediaType = 'image/jpeg') {
+  if (!base64Image || typeof base64Image !== 'string') {
+    throw new Error('Photo scan request is missing image data.')
+  }
+
+  const safeMediaType = SUPPORTED_IMAGE_TYPES.has(mediaType) ? mediaType : 'image/jpeg'
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -82,14 +102,14 @@ async function analyzePhoto(apiKey: string, base64Image: string, mediaType = 'im
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: ANTHROPIC_MODEL,
       max_tokens: 512,
       system: 'You are a nutrition analyst. Estimate macros for food photos. Return JSON: { "name": string, "kcal": number, "protein": number, "carbs": number, "fat": number, "confidence": "high"|"medium"|"low", "notes": string }',
       messages: [
         {
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Image } },
+            { type: 'image', source: { type: 'base64', media_type: safeMediaType, data: base64Image } },
             { type: 'text', text: 'Estimate the macros for this meal. Return only valid JSON.' },
           ],
         },
@@ -105,5 +125,9 @@ async function analyzePhoto(apiKey: string, base64Image: string, mediaType = 'im
   const data = await response.json()
   const text = data.content?.[0]?.text ?? '{}'
   const jsonMatch = text.match(/\{[\s\S]*\}/)
-  return { meal: JSON.parse(jsonMatch ? jsonMatch[0] : text) }
+  try {
+    return { meal: JSON.parse(jsonMatch ? jsonMatch[0] : text) }
+  } catch {
+    throw new Error('AI returned an unreadable food estimate.')
+  }
 }

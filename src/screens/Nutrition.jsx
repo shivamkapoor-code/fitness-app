@@ -8,6 +8,48 @@ import { analyzePhoto, getAIInsight } from '../ai/claude'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 
 const TABS = ['breakfast', 'lunch', 'dinner', 'snack']
+const MAX_PHOTO_EDGE = 1280
+const PHOTO_JPEG_QUALITY = 0.82
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    const url = URL.createObjectURL(file)
+    image.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(image)
+    }
+    image.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Could not read this image. Try taking the photo again.'))
+    }
+    image.src = url
+  })
+}
+
+async function preparePhotoForAI(file) {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Choose a food photo to scan.')
+  }
+
+  const image = await loadImageFromFile(file)
+  const scale = Math.min(1, MAX_PHOTO_EDGE / Math.max(image.width, image.height))
+  const width = Math.max(1, Math.round(image.width * scale))
+  const height = Math.max(1, Math.round(image.height * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Could not process this photo.')
+
+  context.drawImage(image, 0, 0, width, height)
+  const dataUrl = canvas.toDataURL('image/jpeg', PHOTO_JPEG_QUALITY)
+  return {
+    base64: dataUrl.split(',')[1],
+    mediaType: 'image/jpeg',
+  }
+}
 
 export function Nutrition({ state, addMeal, removeMeal, today }) {
   const totals = state.nutrition[today]?.totals ?? { kcal: 0, protein: 0, carbs: 0, fat: 0 }
@@ -50,31 +92,22 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
     if (!file) return
     setPhotoLoading(true)
     try {
-      const reader = new FileReader()
-      reader.onload = async (ev) => {
-        const base64 = ev.target.result.split(',')[1]
-        const mediaType = file.type
-        try {
-          const result = await analyzePhoto(base64, mediaType)
-          addMeal(today, {
-            id: `photo_${Date.now()}`,
-            name: result.name ?? 'Photo meal',
-            kcal: result.kcal ?? 0,
-            protein: result.protein ?? 0,
-            carbs: result.carbs ?? 0,
-            fat: result.fat ?? 0,
-            confidence: result.confidence,
-            notes: result.notes,
-          })
-          showToast(`${result.name} added (${result.confidence} confidence)`)
-        } catch (err) {
-          showToast(err.message, 'error')
-        } finally {
-          setPhotoLoading(false)
-        }
-      }
-      reader.readAsDataURL(file)
-    } catch {
+      const { base64, mediaType } = await preparePhotoForAI(file)
+      const result = await analyzePhoto(base64, mediaType)
+      addMeal(today, {
+        id: `photo_${Date.now()}`,
+        name: result.name ?? 'Photo meal',
+        kcal: result.kcal ?? 0,
+        protein: result.protein ?? 0,
+        carbs: result.carbs ?? 0,
+        fat: result.fat ?? 0,
+        confidence: result.confidence,
+        notes: result.notes,
+      })
+      showToast(`${result.name ?? 'Photo meal'} added (${result.confidence ?? 'low'} confidence)`)
+    } catch (err) {
+      showToast(err.message, 'error')
+    } finally {
       setPhotoLoading(false)
     }
     e.target.value = ''

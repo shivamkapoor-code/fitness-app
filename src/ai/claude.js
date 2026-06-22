@@ -59,7 +59,20 @@ CURRENT DATA (${today}):
 async function invokeCoach(body) {
   if (!supabase) throw new Error('Supabase is not configured. AI features need Supabase Edge Functions.')
   const { data, error } = await supabase.functions.invoke('ai-coach', { body })
-  if (error) throw new Error(error.message)
+
+  if (error) {
+    let detail = ''
+    try {
+      if (error.context?.json) {
+        const parsed = await error.context.json()
+        detail = parsed?.error ?? ''
+      }
+    } catch {
+      detail = ''
+    }
+    throw new Error(detail || error.message)
+  }
+
   if (data?.error) throw new Error(data.error)
   return data
 }
