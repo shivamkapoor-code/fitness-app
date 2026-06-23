@@ -68,7 +68,9 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
   const barcodeReaderRef = useRef(null)
 
   function addFromLibrary(meal) {
-    addMeal(today, { ...meal })
+    const mealLog = { ...meal }
+    delete mealLog.recipe
+    addMeal(today, mealLog)
     showToast(`${meal.name} added`)
   }
 
@@ -270,21 +272,53 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
         <div className="p-4 space-y-2">
           <p className="text-slate-500 text-xs italic">Tip: Mix & match. Swap a salmon lunch for chicken if needed.</p>
           {(MEALS[libraryTab] ?? []).map((meal) => (
-            <div key={meal.id} className="bg-slate-700 rounded-xl p-3 flex items-start gap-3">
-              <div className="flex-1">
-                <div className="text-white text-sm font-medium">{meal.name}</div>
-                <div className="text-slate-400 text-xs mt-0.5">{meal.desc}</div>
-                <div className="flex gap-3 mt-1.5 text-xs">
-                  <span className="text-emerald-400">{meal.kcal} kcal</span>
-                  <span className="text-blue-400">{meal.protein}g P</span>
-                  <span className="text-amber-400">{meal.carbs}g C</span>
-                  <span className="text-red-400">{meal.fat}g F</span>
+            <div key={meal.id} className="bg-slate-700 rounded-xl p-3">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-white text-sm font-medium">{meal.name}</div>
+                  <div className="text-slate-400 text-xs mt-0.5">{meal.desc}</div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs">
+                    <span className="text-emerald-400">{meal.kcal} kcal</span>
+                    <span className="text-blue-400">{meal.protein}g P</span>
+                    <span className="text-amber-400">{meal.carbs}g C</span>
+                    <span className="text-red-400">{meal.fat}g F</span>
+                  </div>
                 </div>
+                <button onClick={() => { addFromLibrary(meal); setShowLibrary(false) }}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium flex-shrink-0">
+                  Add
+                </button>
               </div>
-              <button onClick={() => { addFromLibrary(meal); setShowLibrary(false) }}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium flex-shrink-0">
-                Add
-              </button>
+              {meal.recipe && (
+                <details className="mt-3 border-t border-slate-600/70 pt-3">
+                  <summary className="cursor-pointer list-none text-[11px] font-heading font-semibold uppercase tracking-widest text-emerald-400">
+                    Recipe + meal prep
+                  </summary>
+                  <div className="mt-3 space-y-3">
+                    <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
+                      <span className="rounded-lg border border-slate-600 px-2 py-1">Batch: {meal.recipe.servings} serving{meal.recipe.servings === 1 ? '' : 's'}</span>
+                      <span className="rounded-lg border border-slate-600 px-2 py-1">Prep: {meal.recipe.prepTime}</span>
+                      <span className="rounded-lg border border-slate-600 px-2 py-1">Storage: {meal.recipe.storage}</span>
+                    </div>
+                    <div>
+                      <div className="text-slate-500 text-[10px] uppercase tracking-widest font-heading mb-1">Ingredients</div>
+                      <ul className="space-y-1">
+                        {meal.recipe.ingredients.map((ingredient) => (
+                          <li key={ingredient} className="text-slate-300 text-xs leading-relaxed">- {ingredient}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <div className="text-slate-500 text-[10px] uppercase tracking-widest font-heading mb-1">Prep Steps</div>
+                      <ol className="space-y-1">
+                        {meal.recipe.steps.map((step, idx) => (
+                          <li key={step} className="text-slate-300 text-xs leading-relaxed">{idx + 1}. {step}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
+                </details>
+              )}
             </div>
           ))}
         </div>
