@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RefreshCw, Loader2, AlertTriangle, ChevronRight, Zap } from 'lucide-react'
+import { RefreshCw, Loader2, AlertTriangle, ChevronRight, Zap, Plus, Trash2 } from 'lucide-react'
 import { MacroRings } from '../components/MacroRings'
 import { calcInflamScore, calcBioAge } from '../utils/bioAge'
 import { calcCalorieReview } from '../utils/calorieReview'
@@ -12,9 +12,10 @@ import { SUPPLEMENTS } from '../data/supplements'
 const STIFFNESS_LABELS = ['', 'Minimal', 'Mild', 'Moderate', 'Significant', 'Severe']
 const STIFFNESS_COLORS = ['', 'text-emerald-400', 'text-emerald-400', 'text-amber-400', 'text-red-400', 'text-red-500']
 
-export function Dashboard({ state, setStiffness, today, onNavigate, user }) {
+export function Dashboard({ state, setStiffness, today, onNavigate, user, addCustomItem, removeCustomItem }) {
   const [insight, setInsight] = useState('')
   const [loadingInsight, setLoadingInsight] = useState(false)
+  const [leverForm, setLeverForm] = useState({ lever: '', action: '' })
 
   const todayNutrition = state.nutrition[today]?.totals ?? { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   const stiffness = state.morningStiffness[today] ?? null
@@ -72,6 +73,21 @@ export function Dashboard({ state, setStiffness, today, onNavigate, user }) {
   }
 
   const inflamColor = inflam7[6] <= 2 ? 'bg-emerald-500' : inflam7[6] <= 3.5 ? 'bg-amber-500' : 'bg-red-500'
+  const customLevers = state.customItems?.dashboardLevers ?? []
+
+  function addLever() {
+    if (!leverForm.lever.trim() || !leverForm.action.trim()) {
+      showToast('Add a lever and action', 'warn')
+      return
+    }
+    addCustomItem('dashboardLevers', {
+      lever: leverForm.lever.trim(),
+      action: leverForm.action.trim(),
+      color: 'bg-emerald-500/20 text-emerald-300',
+    })
+    setLeverForm({ lever: '', action: '' })
+    showToast('Dashboard item added')
+  }
 
   return (
     <div className="px-4 py-4 pb-20 space-y-4">
@@ -269,17 +285,44 @@ export function Dashboard({ state, setStiffness, today, onNavigate, user }) {
 
       {/* The 3 Levers */}
       <div className="glass p-4 space-y-3">
-        <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">The 3 Levers</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">The 3 Levers</h3>
+          <Plus size={14} className="text-accent" />
+        </div>
         {[
           { lever: 'Training', action: 'Progressive overload + protect L5-S1', color: 'bg-blue-500/20 text-blue-300' },
           { lever: 'Nutrition', action: '185g protein daily, adjust carbs first', color: 'bg-amber-500/20 text-amber-300' },
           { lever: 'Recovery', action: 'Zone 2, sleep 8h, reduce inflammation', color: 'bg-purple-500/20 text-purple-300' },
+          ...customLevers,
         ].map(({ lever, action, color }) => (
           <div key={lever} className={`rounded-xl px-3 py-2.5 flex items-center gap-3 ${color}`}>
             <span className="font-heading text-sm font-bold w-20 flex-shrink-0">{lever}</span>
-            <span className="text-xs">{action}</span>
+            <span className="text-xs flex-1">{action}</span>
+            {customLevers.some((item) => item.lever === lever && item.action === action) && (
+              <button onClick={() => removeCustomItem('dashboardLevers', customLevers.find((item) => item.lever === lever && item.action === action)?.id)}
+                className="text-red-300">
+                <Trash2 size={12} />
+              </button>
+            )}
           </div>
         ))}
+        <div className="grid grid-cols-1 gap-2 pt-1">
+          <input
+            value={leverForm.lever}
+            onChange={(e) => setLeverForm({ ...leverForm, lever: e.target.value })}
+            placeholder="New lever"
+            className="glass-elevated border border-slate-600 rounded-xl px-3 py-2 text-primary-color text-xs focus:outline-none focus:border-emerald-500"
+          />
+          <input
+            value={leverForm.action}
+            onChange={(e) => setLeverForm({ ...leverForm, action: e.target.value })}
+            placeholder="Action to track"
+            className="glass-elevated border border-slate-600 rounded-xl px-3 py-2 text-primary-color text-xs focus:outline-none focus:border-emerald-500"
+          />
+          <button onClick={addLever} className="btn-ghost rounded-xl py-2 text-xs font-heading font-semibold">
+            Add Dashboard Item
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -26,7 +26,7 @@ function RecommendationBadge({ rec }) {
   return null
 }
 
-function ExerciseCard({ exercise, workoutLog, today, logSet, removeSet, state, isCore = false }) {
+function ExerciseCard({ exercise, workoutLog, today, logSet, removeSet, state, isCore = false, onDeleteExercise }) {
   const [expanded, setExpanded] = useState(false)
   const [weight, setWeight] = useState('')
   const [reps, setReps] = useState('')
@@ -196,6 +196,12 @@ function ExerciseCard({ exercise, workoutLog, today, logSet, removeSet, state, i
               </button>
             )}
           </div>
+          {exercise.custom && (
+            <button onClick={onDeleteExercise}
+              className="w-full flex items-center justify-center gap-1.5 bg-red-500/10 border border-red-500/20 text-red-300 rounded-xl py-2 text-xs font-medium">
+              <Trash2 size={12} /> Delete Custom Exercise
+            </button>
+          )}
           {exercise.conditional && (
             <div className="flex gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5">
               <AlertTriangle size={12} className="text-amber-400 flex-shrink-0 mt-0.5" />
@@ -389,14 +395,32 @@ Based on this data, give me a readiness verdict and brief guidance. Your respons
   )
 }
 
-export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, today }) {
+export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, today, addCustomItem, removeCustomItem }) {
   const [showSwap, setShowSwap] = useState(false)
   const [showWarmup, setShowWarmup] = useState(false)
+  const [exerciseForm, setExerciseForm] = useState({ name: '', sets: '', repsRange: '', rest: '' })
 
   const queue = state.workoutQueue
   const stiffness = state.morningStiffness[today] ?? null
   const currentDayIdx = queue.seq[queue.idx]
   const workout = WORKOUT_SPLIT[currentDayIdx]
+  const workoutKey = String(workout.day)
+  const customExercises = state.customItems?.workoutExercises?.[workoutKey] ?? []
+  const allExercises = [...(workout.exercises ?? []), ...customExercises]
+
+  function addCustomExercise() {
+    if (!exerciseForm.name.trim()) { showToast('Enter an exercise name', 'warn'); return }
+    addCustomItem('workoutExercises', {
+      name: exerciseForm.name.trim(),
+      tag: 'custom',
+      sets: parseInt(exerciseForm.sets) || 3,
+      repsRange: exerciseForm.repsRange.trim() || '8-12',
+      rest: parseInt(exerciseForm.rest) || 90,
+      custom: true,
+    }, workoutKey)
+    setExerciseForm({ name: '', sets: '', repsRange: '', rest: '' })
+    showToast('Custom exercise added')
+  }
 
   // Next 4 in queue
   const nextQueue = [0, 1, 2, 3].map((offset) => {
@@ -488,7 +512,7 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
       )}
 
       {/* Rest day */}
-      {workout.exercises?.length === 0 && !workout.mobility && (
+      {allExercises.length === 0 && !workout.mobility && (
         <div className="bg-slate-800 rounded-2xl p-6 text-center space-y-2">
           <div className="text-4xl">😴</div>
           <div className="font-heading text-lg font-bold text-white">Rest Day</div>
@@ -497,10 +521,10 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
       )}
 
       {/* Main exercises */}
-      {workout.exercises?.length > 0 && (
+      {allExercises.length > 0 && (
         <div className="space-y-3">
           <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">Main Exercises</h3>
-          {workout.exercises.map((ex) => (
+          {allExercises.map((ex) => (
             <ExerciseCard
               key={ex.name}
               exercise={ex}
@@ -509,8 +533,25 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
               logSet={logSet}
               removeSet={removeSet}
               state={state}
+              onDeleteExercise={ex.custom ? () => { removeCustomItem('workoutExercises', ex.id, workoutKey); showToast('Custom exercise deleted') } : undefined}
             />
           ))}
+          <div className="bg-slate-800 rounded-2xl p-4 space-y-2">
+            <div className="text-slate-400 text-[10px] uppercase tracking-widest font-heading">Add Custom Exercise</div>
+            <input value={exerciseForm.name} onChange={(e) => setExerciseForm({ ...exerciseForm, name: e.target.value })}
+              placeholder="Exercise name" className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+            <div className="grid grid-cols-3 gap-2">
+              <input type="number" value={exerciseForm.sets} onChange={(e) => setExerciseForm({ ...exerciseForm, sets: e.target.value })}
+                placeholder="sets" className="bg-slate-700 border border-slate-600 rounded-xl px-2 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+              <input value={exerciseForm.repsRange} onChange={(e) => setExerciseForm({ ...exerciseForm, repsRange: e.target.value })}
+                placeholder="reps" className="bg-slate-700 border border-slate-600 rounded-xl px-2 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+              <input type="number" value={exerciseForm.rest} onChange={(e) => setExerciseForm({ ...exerciseForm, rest: e.target.value })}
+                placeholder="rest sec" className="bg-slate-700 border border-slate-600 rounded-xl px-2 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+            </div>
+            <button onClick={addCustomExercise} className="w-full bg-slate-700 hover:bg-slate-600 text-white rounded-xl py-2 text-xs font-heading font-semibold">
+              Add Exercise
+            </button>
+          </div>
         </div>
       )}
 

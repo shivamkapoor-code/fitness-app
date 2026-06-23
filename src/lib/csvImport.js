@@ -5,8 +5,15 @@ const FIELD_MATCHERS = {
   weight_lbs: (c) => c.includes('weight') && (c.includes('lb') || c.includes('pound') || (!c.includes('kg') && !c.includes('used') && !c.includes('lifted'))),
   weight_kg: (c) => c.includes('weight') && c.includes('kg') && !c.includes('used'),
   body_fat_pct: (c) => (c.includes('body fat') || c.includes('fat %') || c.includes('fat%') || c.includes('fat pct')) && !c.includes('sub') && !c.includes('visceral'),
+  bmi: (c) => c === 'bmi' || c.includes('body mass index'),
+  subcutaneous_fat_pct: (c) => c.includes('subcutaneous'),
   visceral_fat: (c) => c.includes('visceral'),
   muscle_mass: (c) => (c.includes('muscle mass') || c.includes('muscle(lb') || c.includes('muscle(kg')) && !c.includes('%'),
+  skeletal_muscle_pct: (c) => c.includes('skeletal muscle'),
+  fat_free_body_weight: (c) => c.includes('fat-free') || c.includes('fat free') || c.includes('lean body weight'),
+  body_water_pct: (c) => c.includes('body water') || c === 'water',
+  bone_mass: (c) => c.includes('bone mass'),
+  protein_pct: (c) => c === 'protein' || c.includes('protein rate') || c.includes('protein %'),
   bmr: (c) => c === 'bmr' || c.includes('basal metabolic'),
   metabolic_age: (c) => c.includes('metabolic age'),
   waist: (c) => c.includes('waist'),
@@ -42,20 +49,32 @@ function normaliseDate(raw) {
 
 function inferType(fields) {
   const f = fields.join(' ')
-  if (f.includes('weight_lbs') || f.includes('body_fat') || f.includes('visceral')) return 'body_metrics'
+  if (f.includes('weight_lbs') || f.includes('body_fat') || f.includes('visceral') || f.includes('skeletal_muscle') || f.includes('body_water')) return 'body_metrics'
   if (f.includes('exercise_name') || f.includes('reps') || f.includes('set_number')) return 'workout'
   if (f.includes('kcal') || f.includes('protein') || f.includes('meal_name')) return 'nutrition'
   return 'unknown'
 }
 
 function buildBodyMetricEntry(date, metrics) {
+  const muscleMass = metrics.muscle_mass ? parseFloat(metrics.muscle_mass) : undefined
+  const muscleMassLbs = metrics.raw_units?.muscle_mass === 'kg' && muscleMass
+    ? muscleMass * 2.20462
+    : muscleMass
+
   return {
     date,
     weight_lbs: metrics.weight_lbs ? parseFloat(metrics.weight_lbs) :
                 metrics.weight_kg ? parseFloat(metrics.weight_kg) * 2.20462 : undefined,
     body_fat_pct: metrics.body_fat_pct ? parseFloat(metrics.body_fat_pct) : undefined,
+    bmi: metrics.bmi ? parseFloat(metrics.bmi) : undefined,
+    subcutaneous_fat_pct: metrics.subcutaneous_fat_pct ? parseFloat(metrics.subcutaneous_fat_pct) : undefined,
     visceral_fat: metrics.visceral_fat ? parseFloat(metrics.visceral_fat) : undefined,
-    muscle_mass_lbs: metrics.muscle_mass ? parseFloat(metrics.muscle_mass) : undefined,
+    muscle_mass_lbs: muscleMassLbs,
+    skeletal_muscle_pct: metrics.skeletal_muscle_pct ? parseFloat(metrics.skeletal_muscle_pct) : undefined,
+    fat_free_body_weight_lbs: metrics.fat_free_body_weight ? parseFloat(metrics.fat_free_body_weight) : undefined,
+    body_water_pct: metrics.body_water_pct ? parseFloat(metrics.body_water_pct) : undefined,
+    bone_mass_lbs: metrics.bone_mass ? parseFloat(metrics.bone_mass) : undefined,
+    protein_pct: metrics.protein_pct ? parseFloat(metrics.protein_pct) : undefined,
     bmr: metrics.bmr ? parseFloat(metrics.bmr) : undefined,
     metabolic_age: metrics.metabolic_age ? parseFloat(metrics.metabolic_age) : undefined,
     waist_inches: metrics.waist ? parseFloat(metrics.waist) : undefined,
@@ -130,7 +149,7 @@ function parseHorizontal(csvText) {
       if (mapped.weight_kg && !mapped.weight_lbs) {
         mapped.weight_lbs = parseFloat(mapped.weight_kg) * 2.20462
       }
-      return mapped
+      return buildBodyMetricEntry(mapped.date, mapped)
     })
     .filter(r => r.date)
 

@@ -51,7 +51,7 @@ async function preparePhotoForAI(file) {
   }
 }
 
-export function Nutrition({ state, addMeal, removeMeal, today }) {
+export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, removeCustomItem }) {
   const totals = state.nutrition[today]?.totals ?? { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   const meals = state.nutrition[today]?.meals ?? []
 
@@ -59,6 +59,7 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
   const [showManual, setShowManual] = useState(false)
   const [showBarcode, setShowBarcode] = useState(false)
   const [libraryTab, setLibraryTab] = useState('breakfast')
+  const [libraryForm, setLibraryForm] = useState({ name: '', desc: '', kcal: '', protein: '', carbs: '', fat: '' })
   const [manualForm, setManualForm] = useState({ name: '', kcal: '', protein: '', carbs: '', fat: '' })
   const [aiCoach, setAiCoach] = useState('')
   const [loadingAI, setLoadingAI] = useState(false)
@@ -72,6 +73,21 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
     delete mealLog.recipe
     addMeal(today, mealLog)
     showToast(`${meal.name} added`)
+  }
+
+  function addCustomMeal() {
+    if (!libraryForm.name.trim()) { showToast('Enter a meal name', 'warn'); return }
+    addCustomItem('meals', {
+      name: libraryForm.name.trim(),
+      desc: libraryForm.desc.trim() || 'Custom meal',
+      kcal: parseFloat(libraryForm.kcal) || 0,
+      protein: parseFloat(libraryForm.protein) || 0,
+      carbs: parseFloat(libraryForm.carbs) || 0,
+      fat: parseFloat(libraryForm.fat) || 0,
+      custom: true,
+    }, libraryTab)
+    setLibraryForm({ name: '', desc: '', kcal: '', protein: '', carbs: '', fat: '' })
+    showToast('Meal library item added')
   }
 
   function submitManual() {
@@ -271,7 +287,7 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
         </div>
         <div className="p-4 space-y-2">
           <p className="text-slate-500 text-xs italic">Tip: Mix & match. Swap a salmon lunch for chicken if needed.</p>
-          {(MEALS[libraryTab] ?? []).map((meal) => (
+          {[...(MEALS[libraryTab] ?? []), ...(state.customItems?.meals?.[libraryTab] ?? [])].map((meal) => (
             <div key={meal.id} className="bg-slate-700 rounded-xl p-3">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
@@ -288,6 +304,12 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
                   className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium flex-shrink-0">
                   Add
                 </button>
+                {meal.custom && (
+                  <button onClick={() => { removeCustomItem('meals', meal.id, libraryTab); showToast('Meal library item deleted') }}
+                    className="bg-red-500/15 text-red-300 rounded-lg px-2 py-1.5 flex-shrink-0">
+                    <Trash2 size={13} />
+                  </button>
+                )}
               </div>
               {meal.recipe && (
                 <details className="mt-3 border-t border-slate-600/70 pt-3">
@@ -321,6 +343,27 @@ export function Nutrition({ state, addMeal, removeMeal, today }) {
               )}
             </div>
           ))}
+          <div className="bg-slate-700/60 rounded-xl p-3 space-y-2">
+            <div className="text-slate-400 text-[10px] uppercase tracking-widest font-heading">Add Custom Meal</div>
+            <input value={libraryForm.name} onChange={(e) => setLibraryForm({ ...libraryForm, name: e.target.value })}
+              placeholder="Meal name" className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+            <input value={libraryForm.desc} onChange={(e) => setLibraryForm({ ...libraryForm, desc: e.target.value })}
+              placeholder="Description" className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                ['kcal', 'kcal'],
+                ['protein', 'protein'],
+                ['carbs', 'carbs'],
+                ['fat', 'fat'],
+              ].map(([key, placeholder]) => (
+                <input key={key} type="number" value={libraryForm[key]} onChange={(e) => setLibraryForm({ ...libraryForm, [key]: e.target.value })}
+                  placeholder={placeholder} className="bg-slate-800 border border-slate-600 rounded-xl px-2 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+              ))}
+            </div>
+            <button onClick={addCustomMeal} className="w-full bg-slate-600 hover:bg-slate-500 text-white rounded-xl py-2 text-xs font-heading font-semibold">
+              Add to {libraryTab}
+            </button>
+          </div>
         </div>
       </Modal>
 

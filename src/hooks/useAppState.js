@@ -4,6 +4,13 @@ import { supabase } from '../lib/supabase'
 const STORAGE_KEY = 'shivam_fitness_v1'
 
 const defaultQueue = { seq: [1, 2, 3, 4, 5, 6, 0], idx: 0, lastDate: null }
+const defaultCustomItems = {
+  dashboardLevers: [],
+  workoutExercises: {},
+  meals: { breakfast: [], lunch: [], dinner: [], snack: [] },
+  supplements: [],
+  inflammationHabits: [],
+}
 
 function loadState() {
   try {
@@ -25,10 +32,23 @@ function normaliseState(saved) {
     workoutLog: saved?.workoutLog ?? {},
     nutrition: saved?.nutrition ?? {},
     bodyMetrics: saved?.bodyMetrics ?? [],
+    renphoEntries: saved?.renphoEntries ?? [],
     suppChecks: saved?.suppChecks ?? {},
     inflam: saved?.inflam ?? {},
     workoutQueue: saved?.workoutQueue ?? defaultQueue,
     morningStiffness: saved?.morningStiffness ?? {},
+    customItems: {
+      ...defaultCustomItems,
+      ...(saved?.customItems ?? {}),
+      meals: {
+        ...defaultCustomItems.meals,
+        ...(saved?.customItems?.meals ?? {}),
+      },
+      workoutExercises: {
+        ...defaultCustomItems.workoutExercises,
+        ...(saved?.customItems?.workoutExercises ?? {}),
+      },
+    },
     chatHistory: [],
   }
 }
@@ -207,6 +227,43 @@ export function useAppState(userId) {
     })
   }, [])
 
+  const removeBodyMetric = useCallback((date) => {
+    setState((prev) => ({
+      ...prev,
+      bodyMetrics: prev.bodyMetrics.filter((entry) => entry.date !== date),
+      renphoEntries: prev.renphoEntries.filter((entry) => entry.date !== date),
+    }))
+  }, [])
+
+  const addRenphoEntries = useCallback((entries) => {
+    setState((prev) => {
+      const byDate = new Map(prev.renphoEntries.map((entry) => [entry.date, entry]))
+      entries.forEach((entry) => byDate.set(entry.date, { ...entry, importedAt: Date.now() }))
+      const renphoEntries = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
+
+      const metricByDate = new Map(prev.bodyMetrics.map((entry) => [entry.date, entry]))
+      entries.forEach((entry) => {
+        metricByDate.set(entry.date, {
+          ...metricByDate.get(entry.date),
+          date: entry.date,
+          weight: entry.weight_lbs,
+          bodyFat: entry.body_fat_pct,
+          visceralFat: entry.visceral_fat,
+          muscleMass: entry.muscle_mass_lbs,
+          bmr: entry.bmr,
+          metabolicAge: entry.metabolic_age,
+          recordedAt: Date.now(),
+        })
+      })
+
+      return {
+        ...prev,
+        renphoEntries,
+        bodyMetrics: [...metricByDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
+      }
+    })
+  }, [])
+
   // Supplement checks
   const toggleSupp = useCallback((date, suppId) => {
     setState((prev) => {
@@ -216,6 +273,87 @@ export function useAppState(userId) {
         suppChecks: {
           ...prev.suppChecks,
           [date]: { ...dayChecks, [suppId]: !dayChecks[suppId] },
+        },
+      }
+    })
+  }, [])
+
+  const addCustomItem = useCallback((group, item, subGroup = null) => {
+    setState((prev) => {
+      const customItems = prev.customItems ?? defaultCustomItems
+      const newItem = { ...item, id: item.id ?? `custom_${Date.now()}` }
+
+      if (group === 'meals' && subGroup) {
+        return {
+          ...prev,
+          customItems: {
+            ...customItems,
+            meals: {
+              ...customItems.meals,
+              [subGroup]: [...(customItems.meals?.[subGroup] ?? []), newItem],
+            },
+          },
+        }
+      }
+
+      if (group === 'workoutExercises' && subGroup) {
+        return {
+          ...prev,
+          customItems: {
+            ...customItems,
+            workoutExercises: {
+              ...customItems.workoutExercises,
+              [subGroup]: [...(customItems.workoutExercises?.[subGroup] ?? []), newItem],
+            },
+          },
+        }
+      }
+
+      return {
+        ...prev,
+        customItems: {
+          ...customItems,
+          [group]: [...(customItems[group] ?? []), newItem],
+        },
+      }
+    })
+  }, [])
+
+  const removeCustomItem = useCallback((group, itemId, subGroup = null) => {
+    setState((prev) => {
+      const customItems = prev.customItems ?? defaultCustomItems
+
+      if (group === 'meals' && subGroup) {
+        return {
+          ...prev,
+          customItems: {
+            ...customItems,
+            meals: {
+              ...customItems.meals,
+              [subGroup]: (customItems.meals?.[subGroup] ?? []).filter((item) => item.id !== itemId),
+            },
+          },
+        }
+      }
+
+      if (group === 'workoutExercises' && subGroup) {
+        return {
+          ...prev,
+          customItems: {
+            ...customItems,
+            workoutExercises: {
+              ...customItems.workoutExercises,
+              [subGroup]: (customItems.workoutExercises?.[subGroup] ?? []).filter((item) => item.id !== itemId),
+            },
+          },
+        }
+      }
+
+      return {
+        ...prev,
+        customItems: {
+          ...customItems,
+          [group]: (customItems[group] ?? []).filter((item) => item.id !== itemId),
         },
       }
     })
@@ -273,7 +411,11 @@ export function useAppState(userId) {
     addMeal,
     removeMeal,
     addBodyMetric,
+    removeBodyMetric,
+    addRenphoEntries,
     toggleSupp,
+    addCustomItem,
+    removeCustomItem,
     saveInflam,
     setStiffness,
     advanceQueue,

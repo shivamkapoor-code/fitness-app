@@ -87,6 +87,10 @@ export async function getAIInsight(prompt, state, today) {
   return callClaude([{ role: 'user', content: prompt }], context)
 }
 
+export async function getRenphoRecommendations(prompt) {
+  return callClaude([{ role: 'user', content: prompt }])
+}
+
 export async function analyzePhoto(base64Image, mediaType = 'image/jpeg') {
   const data = await invokeCoach({ action: 'photo', base64Image, mediaType })
   return data.meal ?? { name: 'Unknown meal', kcal: 0, protein: 0, carbs: 0, fat: 0, confidence: 'low', notes: '' }

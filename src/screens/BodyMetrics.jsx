@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Plus, RefreshCw, Loader2, Upload, Target } from 'lucide-react'
+import { Plus, RefreshCw, Loader2, Upload, Target, Trash2 } from 'lucide-react'
 import { Modal } from '../components/Modal'
 import { calcBioAge } from '../utils/bioAge'
 import { calcBodyProjection } from '../utils/projection'
-import { getAIInsight } from '../ai/claude'
+import { getAIInsight, getRenphoRecommendations } from '../ai/claude'
 import { showToast } from '../utils/toast'
 import { detectAndParseCSV } from '../lib/csvImport'
+import { analyzeRenphoTrends, buildRenphoPrompt, summarizeRenphoForUi } from '../utils/renphoAnalysis'
 
 const TARGETS = { weight: 175, bodyFat: 15, visceralFat: 9, waist: null }
 
@@ -69,14 +70,18 @@ function SVGChart({ data, color = '#10b981', label, unit = '' }) {
   )
 }
 
-export function BodyMetrics({ state, addBodyMetric, today, user }) {
+export function BodyMetrics({ state, addBodyMetric, removeBodyMetric, addRenphoEntries, today, user }) {
   const [showCheckin, setShowCheckin] = useState(false)
   const [form, setForm] = useState({ date: today, weight: '', bodyFat: '', visceralFat: '', waist: '', neck: '', muscleMass: '' })
   const [insight, setInsight] = useState('')
   const [loading, setLoading] = useState(false)
+  const [renphoLoading, setRenphoLoading] = useState(false)
+  const [renphoRecommendation, setRenphoRecommendation] = useState('')
   const [csvPreview, setCsvPreview] = useState(null) // { rows, unmappedColumns, type }
 
   const metrics = state.bodyMetrics
+  const renphoEntries = state.renphoEntries ?? []
+  const renphoAnalysis = analyzeRenphoTrends(renphoEntries)
   const latest = metrics.length > 0 ? metrics[metrics.length - 1] : null
   const bioAge = calcBioAge(state.bodyMetrics, state.inflam)
   const projection = calcBodyProjection(state.bodyMetrics)
@@ -129,6 +134,41 @@ export function BodyMetrics({ state, addBodyMetric, today, user }) {
     setCsvPreview(null)
   }
 
+  function handleRenphoFile(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const result = detectAndParseCSV(ev.target.result)
+      const rows = result.rows ?? []
+      if (rows.length === 0) {
+        showToast(result.error || 'No Renpho readings found', 'error')
+        return
+      }
+      addRenphoEntries(rows)
+      setRenphoRecommendation('')
+      showToast(`Imported ${rows.length} Renpho readings`)
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  async function loadRenphoRecommendation() {
+    if (!renphoAnalysis.hasEnoughData) {
+      showToast('Upload at least 2 Renpho readings first', 'warn')
+      return
+    }
+    setRenphoLoading(true)
+    try {
+      const text = await getRenphoRecommendations(buildRenphoPrompt(renphoAnalysis))
+      setRenphoRecommendation(text)
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setRenphoLoading(false)
+    }
+  }
+
   async function loadInsight() {
     setLoading(true)
     try {
@@ -154,6 +194,11 @@ export function BodyMetrics({ state, addBodyMetric, today, user }) {
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-2xl font-bold text-primary-color tracking-wide">Body Metrics</h1>
         <div className="flex gap-2">
+          <label className="flex items-center gap-1.5 btn-ghost rounded-xl px-3 py-2 text-xs font-medium cursor-pointer" style={{ fontSize: 12, padding: '8px 12px' }}>
+            <Upload size={14} style={{ color: 'var(--accent)' }} />
+            Renpho CSV
+            <input type="file" accept=".csv" onChange={handleRenphoFile} className="hidden" />
+          </label>
           <label className="flex items-center gap-1.5 btn-ghost rounded-xl px-3 py-2 text-xs font-medium cursor-pointer" style={{ fontSize: 12, padding: '8px 12px' }}>
             <Upload size={14} style={{ color: 'var(--accent)' }} />
             Import Any CSV
@@ -220,6 +265,27 @@ export function BodyMetrics({ state, addBodyMetric, today, user }) {
         </div>
       )}
 
+      <div className="glass p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">Renpho AI Trend Coach</h3>
+            <div className="text-muted-color text-xs mt-1">{renphoEntries.length} readings · {renphoAnalysis.dateRange}</div>
+          </div>
+          <button onClick={loadRenphoRecommendation} disabled={renphoLoading || !renphoAnalysis.hasEnoughData} className="flex items-center gap-1.5 text-accent text-xs font-medium disabled:opacity-50">
+            {renphoLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {renphoLoading ? 'Analyzing...' : 'Analyze'}
+          </button>
+        </div>
+        <p className="text-muted-color text-sm leading-relaxed">{summarizeRenphoForUi(renphoAnalysis)}</p>
+        {renphoRecommendation ? (
+          <div className="glass-elevated rounded-xl p-3">
+            <p className="text-primary-color text-sm leading-relaxed whitespace-pre-line">{renphoRecommendation}</p>
+          </div>
+        ) : (
+          <p className="text-muted-color text-xs italic">Upload a Renpho CSV, then tap Analyze for workout, diet, and body-composition recommendations. General fitness guidance only, not medical advice.</p>
+        )}
+      </div>
+
       {/* Bio Age */}
       <div className={`glass rounded-2xl p-4 flex items-center justify-between ${bioAge < 36 ? 'bg-emerald-500/15' : bioAge <= 40 ? 'bg-amber-500/15' : 'bg-red-500/15'}`}>
         <div>
@@ -241,6 +307,25 @@ export function BodyMetrics({ state, addBodyMetric, today, user }) {
         <StatCard label="Visceral Fat" value={latest?.visceralFat} unit="" target={TARGETS.visceralFat} color={latest?.visceralFat > 11 ? 'text-red-400' : 'text-amber-400'} />
         <StatCard label="Waist" value={latest?.waist} unit='"' target={null} />
       </div>
+
+      {metrics.length > 0 && (
+        <div className="glass p-4 space-y-2">
+          <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">Recent Entries</h3>
+          {metrics.slice(-5).reverse().map((entry) => (
+            <div key={entry.date} className="glass-elevated rounded-xl p-3 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-primary-color text-sm font-medium">{entry.date}</div>
+                <div className="text-muted-color text-xs">
+                  {entry.weight ?? '—'} lbs · {entry.bodyFat ?? '—'}% BF · VF {entry.visceralFat ?? '—'}
+                </div>
+              </div>
+              <button onClick={() => { removeBodyMetric(entry.date); showToast('Body entry deleted') }} className="text-red-300">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Weight chart */}
       <div className="glass p-4 space-y-3">

@@ -38,11 +38,12 @@ export default function App() {
     state, loading: stateLoading, update, today,
     logSet, removeSet,
     addMeal, removeMeal,
-    addBodyMetric,
+    addBodyMetric, removeBodyMetric, addRenphoEntries,
     toggleSupp, saveInflam,
     setStiffness,
     advanceQueue, swapQueueDay,
     addChatMessage,
+    addCustomItem, removeCustomItem,
   } = useAppState(null)
 
   function updateProfile(patch) {
@@ -87,20 +88,26 @@ export default function App() {
     switch (screen) {
       case 'dashboard':
         return <Dashboard state={state} setStiffness={setStiffness}
-                 today={today} onNavigate={setScreen} user={activeUser} />
+                 today={today} onNavigate={setScreen} user={activeUser}
+                 addCustomItem={addCustomItem} removeCustomItem={removeCustomItem} />
       case 'workout':
         return <Workout state={state} logSet={logSet} removeSet={removeSet}
-                 advanceQueue={advanceQueue} swapQueueDay={swapQueueDay} today={today} />
+                 advanceQueue={advanceQueue} swapQueueDay={swapQueueDay} today={today}
+                 addCustomItem={addCustomItem} removeCustomItem={removeCustomItem} />
       case 'nutrition':
         return <Nutrition state={state} addMeal={addMeal}
-                 removeMeal={removeMeal} today={today} />
+                 removeMeal={removeMeal} today={today}
+                 addCustomItem={addCustomItem} removeCustomItem={removeCustomItem} />
       case 'body':
         return <BodyMetrics state={state} addBodyMetric={addBodyMetric}
+                 removeBodyMetric={removeBodyMetric} addRenphoEntries={addRenphoEntries}
                  today={today} user={activeUser} />
       case 'supplements':
-        return <Supplements state={state} toggleSupp={toggleSupp} today={today} />
+        return <Supplements state={state} toggleSupp={toggleSupp} today={today}
+                 addCustomItem={addCustomItem} removeCustomItem={removeCustomItem} />
       case 'inflammation':
-        return <Inflammation state={state} saveInflam={saveInflam} today={today} />
+        return <Inflammation state={state} saveInflam={saveInflam} today={today}
+                 addCustomItem={addCustomItem} removeCustomItem={removeCustomItem} />
       case 'chat':
         return <AIChat state={state} addChatMessage={addChatMessage} today={today} />
       case 'review':
@@ -113,7 +120,8 @@ export default function App() {
         return <Admin isAdmin={isAdmin} onNavigate={setScreen} />
       default:
         return <Dashboard state={state} setStiffness={setStiffness}
-                 today={today} onNavigate={setScreen} user={activeUser} />
+                 today={today} onNavigate={setScreen} user={activeUser}
+                 addCustomItem={addCustomItem} removeCustomItem={removeCustomItem} />
     }
   }
 

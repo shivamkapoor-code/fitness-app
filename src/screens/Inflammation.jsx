@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RefreshCw, Loader2, Flame } from 'lucide-react'
+import { RefreshCw, Loader2, Flame, Trash2 } from 'lucide-react'
 import { calcInflamScore } from '../utils/bioAge'
 import { showToast } from '../utils/toast'
 import { getAIInsight } from '../ai/claude'
@@ -9,18 +9,19 @@ const SCORE_BG = ['bg-emerald-500/20', 'bg-emerald-500/20', 'bg-amber-500/20', '
 const SCORE_LABELS = ['Excellent', 'Good', 'Moderate', 'Elevated', 'High', 'Critical']
 const SLEEP_OPTIONS = [5, 6, 7, 8, 9]
 
-export function Inflammation({ state, saveInflam, today }) {
+export function Inflammation({ state, saveInflam, today, addCustomItem, removeCustomItem }) {
   const todayData = state.inflam[today] ?? {}
   const score = calcInflamScore(todayData)
   const scoreInt = Math.round(score)
 
   const [insight, setInsight] = useState('')
   const [loading, setLoading] = useState(false)
+  const [habitForm, setHabitForm] = useState({ label: '', desc: '', icon: '+' })
 
-  function toggle(field) {
+  function toggle(field, labelOverride = null) {
     const newVal = !todayData[field]
     saveInflam(today, { [field]: newVal })
-    showToast(`${field === 'zone2' ? 'Zone 2' : field === 'salmon' ? 'Wild Salmon' : field === 'cold' ? 'Cold Contrast' : 'Box Breathing'} ${newVal ? '✓' : 'removed'}`)
+    showToast(`${labelOverride ?? (field === 'zone2' ? 'Zone 2' : field === 'salmon' ? 'Wild Salmon' : field === 'cold' ? 'Cold Contrast' : 'Box Breathing')} ${newVal ? 'saved' : 'removed'}`)
   }
 
   function setSleep(h) {
@@ -64,7 +65,20 @@ export function Inflammation({ state, saveInflam, today }) {
     { key: 'salmon', label: 'Wild Salmon', desc: 'Anti-inflammatory omega-3', icon: '🐟' },
     { key: 'cold', label: 'Cold Contrast', desc: 'Cold shower / contrast therapy', icon: '🧊' },
     { key: 'breathing', label: 'Box Breathing', desc: '5 min 4/4/4/4 pattern', icon: '🫁' },
+    ...(state.customItems?.inflammationHabits ?? []).map((item) => ({ ...item, key: item.id })),
   ]
+
+  function addHabit() {
+    if (!habitForm.label.trim()) { showToast('Enter a habit name', 'warn'); return }
+    addCustomItem('inflammationHabits', {
+      label: habitForm.label.trim(),
+      desc: habitForm.desc.trim() || 'Custom recovery habit',
+      icon: habitForm.icon.trim() || '+',
+      custom: true,
+    })
+    setHabitForm({ label: '', desc: '', icon: '+' })
+    showToast('Inflammation habit added')
+  }
 
   return (
     <div className="px-4 py-4 pb-20 space-y-4">
@@ -88,25 +102,40 @@ export function Inflammation({ state, saveInflam, today }) {
       {/* Habit toggles */}
       <div className="bg-slate-800 rounded-2xl p-4 space-y-2">
         <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest mb-3">Today's Habits</h3>
-        {habits.map(({ key, label, desc, icon }) => {
+        {habits.map(({ key, label, desc, icon, custom }) => {
           const active = !!todayData[key]
           return (
-            <button
+            <div
               key={key}
-              onClick={() => toggle(key)}
               className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${active ? 'bg-emerald-500/15 border border-emerald-500/30' : 'bg-slate-700/50 border border-transparent hover:bg-slate-700'}`}
             >
-              <span className="text-xl">{icon}</span>
-              <div className="flex-1 text-left">
+              <button onClick={() => toggle(key, label)} className="text-xl">{icon}</button>
+              <button onClick={() => toggle(key, label)} className="flex-1 text-left">
                 <div className={`text-sm font-medium ${active ? 'text-emerald-300' : 'text-white'}`}>{label}</div>
                 <div className="text-xs text-slate-500">{desc}</div>
-              </div>
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${active ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600'}`}>
+              </button>
+              <button onClick={() => toggle(key, label)} className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${active ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600'}`}>
                 {active && <div className="w-2 h-2 bg-white rounded-full" />}
-              </div>
-            </button>
+              </button>
+              {custom && (
+                <button onClick={() => { removeCustomItem('inflammationHabits', key); showToast('Habit deleted') }} className="text-red-300">
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
           )
         })}
+        <div className="pt-2 space-y-2 border-t border-slate-700">
+          <input value={habitForm.label} onChange={(e) => setHabitForm({ ...habitForm, label: e.target.value })}
+            placeholder="New habit" className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+          <input value={habitForm.desc} onChange={(e) => setHabitForm({ ...habitForm, desc: e.target.value })}
+            placeholder="Description" className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+          <input value={habitForm.icon} onChange={(e) => setHabitForm({ ...habitForm, icon: e.target.value })}
+            placeholder="Icon" className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+          <button onClick={addHabit} className="w-full bg-slate-700 hover:bg-slate-600 text-white rounded-xl py-2 text-xs font-heading font-semibold">
+            Add Habit
+          </button>
+        </div>
       </div>
 
       {/* Sleep selector */}
