@@ -10,6 +10,9 @@ import { BrowserMultiFormatReader } from '@zxing/browser'
 const TABS = ['breakfast', 'lunch', 'dinner', 'snack']
 const MAX_PHOTO_EDGE = 1280
 const PHOTO_JPEG_QUALITY = 0.82
+const STATIC_MEALS = Object.values(MEALS).flat()
+const STATIC_MEALS_BY_ID = Object.fromEntries(STATIC_MEALS.map((meal) => [meal.id, meal]))
+const STATIC_MEALS_BY_NAME = Object.fromEntries(STATIC_MEALS.map((meal) => [meal.name.toLowerCase(), meal]))
 const EMPTY_RECIPE_FORM = {
   name: '',
   desc: '',
@@ -23,6 +26,47 @@ const EMPTY_RECIPE_FORM = {
   measurement: '',
   ingredients: '',
   steps: '',
+}
+
+function inferLibraryMealId(meal) {
+  if (meal.sourceId) return meal.sourceId
+  const id = String(meal.id ?? '')
+  const match = id.match(/^(?:library_)?([blds]\d+)/)
+  return match?.[1] ?? null
+}
+
+function getAllCustomMeals(customMeals = {}) {
+  return Object.values(customMeals).flat()
+}
+
+function attachRecipeToLoggedMeal(meal, customMeals) {
+  if (meal.recipe) return meal
+
+  const customLibraryMeals = getAllCustomMeals(customMeals)
+  const sourceId = inferLibraryMealId(meal)
+  const matchedMeal = STATIC_MEALS_BY_ID[sourceId]
+    ?? customLibraryMeals.find((item) => item.id === sourceId)
+    ?? STATIC_MEALS_BY_NAME[String(meal.name ?? '').toLowerCase()]
+    ?? customLibraryMeals.find((item) => item.name?.toLowerCase() === meal.name?.toLowerCase())
+
+  if (!matchedMeal?.recipe) return meal
+
+  return {
+    ...meal,
+    sourceId: matchedMeal.id,
+    recipe: matchedMeal.recipe,
+  }
+}
+
+function MeasurementPreview({ measurement }) {
+  if (!measurement) return null
+
+  return (
+    <div className="mt-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5">
+      <span className="text-emerald-300 text-[10px] font-heading uppercase tracking-widest">Measure: </span>
+      <span className="text-slate-300 text-[11px] leading-relaxed">{measurement}</span>
+    </div>
+  )
 }
 
 function splitLines(value) {
@@ -136,7 +180,7 @@ async function preparePhotoForAI(file) {
 
 export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, removeCustomItem }) {
   const totals = state.nutrition[today]?.totals ?? { kcal: 0, protein: 0, carbs: 0, fat: 0 }
-  const meals = state.nutrition[today]?.meals ?? []
+  const meals = (state.nutrition[today]?.meals ?? []).map((meal) => attachRecipeToLoggedMeal(meal, state.customItems?.meals))
 
   const [showLibrary, setShowLibrary] = useState(false)
   const [showManual, setShowManual] = useState(false)
@@ -338,6 +382,7 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
                 <div className="text-white text-sm font-medium truncate">{m.name}</div>
                 <div className="text-slate-400 text-xs">{m.kcal} kcal · {m.protein}g P · {m.carbs}g C · {m.fat}g F</div>
                 {m.confidence && <div className="text-slate-500 text-[10px]">AI estimate — {m.confidence} confidence</div>}
+                <MeasurementPreview measurement={m.recipe?.measurement} />
               </div>
               <button onClick={() => { removeMeal(today, m.id); showToast('Meal removed') }} className="text-slate-500 hover:text-red-400 p-1">
                 <Trash2 size={14} />
@@ -392,6 +437,7 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
                     <span className="text-amber-400">{meal.carbs}g C</span>
                     <span className="text-red-400">{meal.fat}g F</span>
                   </div>
+                  <MeasurementPreview measurement={meal.recipe?.measurement} />
                 </div>
                 <button onClick={() => { addFromLibrary(meal); setShowLibrary(false) }}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium flex-shrink-0">
@@ -409,6 +455,7 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
           ))}
           <div className="bg-slate-700/60 rounded-xl p-3 space-y-2">
             <div className="text-slate-400 text-[10px] uppercase tracking-widest font-heading">Add Custom Meal</div>
+            <div className="text-emerald-300 text-[10px] uppercase tracking-widest font-heading">Recipe + raw/cooked measurement</div>
             <input value={libraryForm.name} onChange={(e) => setLibraryForm({ ...libraryForm, name: e.target.value })}
               placeholder="Meal name" className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
             <input value={libraryForm.desc} onChange={(e) => setLibraryForm({ ...libraryForm, desc: e.target.value })}
