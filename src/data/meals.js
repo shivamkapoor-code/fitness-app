@@ -188,10 +188,53 @@ const RECIPES = {
   },
 }
 
+function measurementGuidanceFor(meal, recipe) {
+  const text = `${meal.name} ${meal.desc} ${(recipe.ingredients ?? []).join(' ')}`.toLowerCase()
+  const notes = []
+
+  if (text.includes('chicken')) {
+    notes.push('Chicken portions are cooked weights when listed as cooked chicken. As a rough conversion, 200g cooked chicken is about 255-270g raw; 220g cooked is about 280-300g raw.')
+  }
+
+  if (text.includes('salmon')) {
+    notes.push('Salmon grams are raw fillet weight unless your food log explicitly says cooked. Cooked salmon is usually about 75-85% of raw weight after baking.')
+  }
+
+  if (text.includes('rice')) {
+    notes.push('Rice amounts are cooked volume/weight. If logging dry rice, 1 cup cooked rice is roughly 60-70g dry depending on the rice.')
+  }
+
+  if (text.includes('quinoa')) {
+    notes.push('Quinoa amounts are cooked volume/weight. If logging dry quinoa, 1 cup cooked quinoa is roughly 55-65g dry.')
+  }
+
+  if (text.includes('sweet potato')) {
+    notes.push('Sweet potato grams can be weighed raw for prep or cooked for logging, but keep the food log entry matched to the same raw/cooked state.')
+  }
+
+  if (text.includes('oat') || text.includes('yogurt') || text.includes('cottage cheese') || text.includes('fairlife') || text.includes('whey')) {
+    notes.push('Packaged and dry ingredients like oats, yogurt, cottage cheese, Fairlife, and whey should be measured as listed on the label or dry package weight.')
+  }
+
+  if (text.includes('avocado')) {
+    notes.push('Avocado should be measured as edible portion only, without skin or pit.')
+  }
+
+  return notes.length > 0
+    ? notes.join(' ')
+    : 'Use the macro source consistently: raw weights with raw entries, cooked weights with cooked entries.'
+}
+
 export const MEALS = Object.fromEntries(
   Object.entries(BASE_MEALS).map(([group, meals]) => [
     group,
-    meals.map((meal) => ({ ...meal, recipe: RECIPES[meal.id] })),
+    meals.map((meal) => ({
+      ...meal,
+      recipe: {
+        ...RECIPES[meal.id],
+        measurement: measurementGuidanceFor(meal, RECIPES[meal.id]),
+      },
+    })),
   ])
 )
 

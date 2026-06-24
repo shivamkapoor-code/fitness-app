@@ -10,6 +10,89 @@ import { BrowserMultiFormatReader } from '@zxing/browser'
 const TABS = ['breakfast', 'lunch', 'dinner', 'snack']
 const MAX_PHOTO_EDGE = 1280
 const PHOTO_JPEG_QUALITY = 0.82
+const EMPTY_RECIPE_FORM = {
+  name: '',
+  desc: '',
+  kcal: '',
+  protein: '',
+  carbs: '',
+  fat: '',
+  servings: '1',
+  prepTime: '',
+  storage: '',
+  measurement: '',
+  ingredients: '',
+  steps: '',
+}
+
+function splitLines(value) {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+function buildRecipeFromForm(form) {
+  const ingredients = splitLines(form.ingredients)
+  const steps = splitLines(form.steps)
+  const hasRecipe = ingredients.length > 0 || steps.length > 0 || form.prepTime.trim() || form.storage.trim() || form.measurement.trim()
+
+  if (!hasRecipe) return null
+
+  return {
+    servings: Math.max(1, parseInt(form.servings, 10) || 1),
+    prepTime: form.prepTime.trim() || 'As needed',
+    storage: form.storage.trim() || 'Store based on ingredients.',
+    measurement: form.measurement.trim() || 'Use the macro source consistently: raw weights with raw entries, cooked weights with cooked entries.',
+    ingredients,
+    steps,
+  }
+}
+
+function RecipeDetails({ recipe, label = 'Recipe + meal prep' }) {
+  if (!recipe) return null
+
+  return (
+    <details className="mt-3 border-t border-slate-600/70 pt-3">
+      <summary className="cursor-pointer list-none text-[11px] font-heading font-semibold uppercase tracking-widest text-emerald-400">
+        {label}
+      </summary>
+      <div className="mt-3 space-y-3">
+        <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
+          <span className="rounded-lg border border-slate-600 px-2 py-1">Batch: {recipe.servings} serving{recipe.servings === 1 ? '' : 's'}</span>
+          <span className="rounded-lg border border-slate-600 px-2 py-1">Prep: {recipe.prepTime}</span>
+          <span className="rounded-lg border border-slate-600 px-2 py-1">Storage: {recipe.storage}</span>
+        </div>
+        {recipe.measurement && (
+          <div className="rounded-xl bg-slate-800/80 border border-slate-600/70 p-2">
+            <div className="text-slate-500 text-[10px] uppercase tracking-widest font-heading mb-1">Measurement</div>
+            <p className="text-slate-300 text-xs leading-relaxed">{recipe.measurement}</p>
+          </div>
+        )}
+        {recipe.ingredients?.length > 0 && (
+          <div>
+            <div className="text-slate-500 text-[10px] uppercase tracking-widest font-heading mb-1">Ingredients</div>
+            <ul className="space-y-1">
+              {recipe.ingredients.map((ingredient) => (
+                <li key={ingredient} className="text-slate-300 text-xs leading-relaxed">- {ingredient}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {recipe.steps?.length > 0 && (
+          <div>
+            <div className="text-slate-500 text-[10px] uppercase tracking-widest font-heading mb-1">Prep Steps</div>
+            <ol className="space-y-1">
+              {recipe.steps.map((step, idx) => (
+                <li key={step} className="text-slate-300 text-xs leading-relaxed">{idx + 1}. {step}</li>
+              ))}
+            </ol>
+          </div>
+        )}
+      </div>
+    </details>
+  )
+}
 
 function loadImageFromFile(file) {
   return new Promise((resolve, reject) => {
@@ -59,7 +142,7 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
   const [showManual, setShowManual] = useState(false)
   const [showBarcode, setShowBarcode] = useState(false)
   const [libraryTab, setLibraryTab] = useState('breakfast')
-  const [libraryForm, setLibraryForm] = useState({ name: '', desc: '', kcal: '', protein: '', carbs: '', fat: '' })
+  const [libraryForm, setLibraryForm] = useState(EMPTY_RECIPE_FORM)
   const [manualForm, setManualForm] = useState({ name: '', kcal: '', protein: '', carbs: '', fat: '' })
   const [aiCoach, setAiCoach] = useState('')
   const [loadingAI, setLoadingAI] = useState(false)
@@ -69,14 +152,18 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
   const barcodeReaderRef = useRef(null)
 
   function addFromLibrary(meal) {
-    const mealLog = { ...meal }
-    delete mealLog.recipe
+    const mealLog = {
+      ...meal,
+      sourceId: meal.id,
+      id: `library_${meal.id}_${Date.now()}`,
+    }
     addMeal(today, mealLog)
     showToast(`${meal.name} added`)
   }
 
   function addCustomMeal() {
     if (!libraryForm.name.trim()) { showToast('Enter a meal name', 'warn'); return }
+    const recipe = buildRecipeFromForm(libraryForm)
     addCustomItem('meals', {
       name: libraryForm.name.trim(),
       desc: libraryForm.desc.trim() || 'Custom meal',
@@ -84,9 +171,10 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
       protein: parseFloat(libraryForm.protein) || 0,
       carbs: parseFloat(libraryForm.carbs) || 0,
       fat: parseFloat(libraryForm.fat) || 0,
+      ...(recipe ? { recipe } : {}),
       custom: true,
     }, libraryTab)
-    setLibraryForm({ name: '', desc: '', kcal: '', protein: '', carbs: '', fat: '' })
+    setLibraryForm(EMPTY_RECIPE_FORM)
     showToast('Meal library item added')
   }
 
@@ -245,7 +333,7 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
         <div className="bg-slate-800 rounded-2xl p-4 space-y-2">
           <h3 className="font-heading text-sm font-semibold text-slate-400 uppercase tracking-widest">Today's Meals</h3>
           {meals.map((m) => (
-            <div key={m.id} className="flex items-center gap-3 bg-slate-700 rounded-xl p-3">
+            <div key={m.id} className="flex flex-wrap items-center gap-3 bg-slate-700 rounded-xl p-3">
               <div className="flex-1 min-w-0">
                 <div className="text-white text-sm font-medium truncate">{m.name}</div>
                 <div className="text-slate-400 text-xs">{m.kcal} kcal · {m.protein}g P · {m.carbs}g C · {m.fat}g F</div>
@@ -254,6 +342,11 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
               <button onClick={() => { removeMeal(today, m.id); showToast('Meal removed') }} className="text-slate-500 hover:text-red-400 p-1">
                 <Trash2 size={14} />
               </button>
+              {m.recipe && (
+                <div className="basis-full">
+                  <RecipeDetails recipe={m.recipe} label="Meal recipe" />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -311,36 +404,7 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
                   </button>
                 )}
               </div>
-              {meal.recipe && (
-                <details className="mt-3 border-t border-slate-600/70 pt-3">
-                  <summary className="cursor-pointer list-none text-[11px] font-heading font-semibold uppercase tracking-widest text-emerald-400">
-                    Recipe + meal prep
-                  </summary>
-                  <div className="mt-3 space-y-3">
-                    <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
-                      <span className="rounded-lg border border-slate-600 px-2 py-1">Batch: {meal.recipe.servings} serving{meal.recipe.servings === 1 ? '' : 's'}</span>
-                      <span className="rounded-lg border border-slate-600 px-2 py-1">Prep: {meal.recipe.prepTime}</span>
-                      <span className="rounded-lg border border-slate-600 px-2 py-1">Storage: {meal.recipe.storage}</span>
-                    </div>
-                    <div>
-                      <div className="text-slate-500 text-[10px] uppercase tracking-widest font-heading mb-1">Ingredients</div>
-                      <ul className="space-y-1">
-                        {meal.recipe.ingredients.map((ingredient) => (
-                          <li key={ingredient} className="text-slate-300 text-xs leading-relaxed">- {ingredient}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div>
-                      <div className="text-slate-500 text-[10px] uppercase tracking-widest font-heading mb-1">Prep Steps</div>
-                      <ol className="space-y-1">
-                        {meal.recipe.steps.map((step, idx) => (
-                          <li key={step} className="text-slate-300 text-xs leading-relaxed">{idx + 1}. {step}</li>
-                        ))}
-                      </ol>
-                    </div>
-                  </div>
-                </details>
-              )}
+              <RecipeDetails recipe={meal.recipe} />
             </div>
           ))}
           <div className="bg-slate-700/60 rounded-xl p-3 space-y-2">
@@ -360,6 +424,26 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
                   placeholder={placeholder} className="bg-slate-800 border border-slate-600 rounded-xl px-2 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
               ))}
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" min="1" value={libraryForm.servings} onChange={(e) => setLibraryForm({ ...libraryForm, servings: e.target.value })}
+                placeholder="servings" className="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+              <input value={libraryForm.prepTime} onChange={(e) => setLibraryForm({ ...libraryForm, prepTime: e.target.value })}
+                placeholder="prep time" className="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+            </div>
+            <input value={libraryForm.storage} onChange={(e) => setLibraryForm({ ...libraryForm, storage: e.target.value })}
+              placeholder="Storage note" className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
+            <textarea value={libraryForm.measurement} onChange={(e) => setLibraryForm({ ...libraryForm, measurement: e.target.value })}
+              placeholder="Raw/cooked measurement note, e.g. macros are for 200g cooked chicken; raw equivalent is about 260g before cooking."
+              rows={2}
+              className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500 resize-none" />
+            <textarea value={libraryForm.ingredients} onChange={(e) => setLibraryForm({ ...libraryForm, ingredients: e.target.value })}
+              placeholder="Ingredients, one per line"
+              rows={3}
+              className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500 resize-none" />
+            <textarea value={libraryForm.steps} onChange={(e) => setLibraryForm({ ...libraryForm, steps: e.target.value })}
+              placeholder="Recipe steps, one per line"
+              rows={3}
+              className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500 resize-none" />
             <button onClick={addCustomMeal} className="w-full bg-slate-600 hover:bg-slate-500 text-white rounded-xl py-2 text-xs font-heading font-semibold">
               Add to {libraryTab}
             </button>
