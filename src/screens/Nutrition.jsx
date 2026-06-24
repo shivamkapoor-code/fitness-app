@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Plus, Trash2, Camera, Barcode, PenLine, BookOpen, Loader2, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, Camera, Barcode, PenLine, BookOpen, Loader2, RefreshCw, ChevronDown } from 'lucide-react'
 import { MacroRings } from '../components/MacroRings'
 import { Modal } from '../components/Modal'
 import { MEALS, MACRO_TARGETS } from '../data/meals'
@@ -93,13 +93,14 @@ function buildRecipeFromForm(form) {
   }
 }
 
-function RecipeDetails({ recipe, label = 'Recipe + meal prep' }) {
+function RecipeDetails({ recipe, label = 'View recipe + meal prep', defaultOpen = false }) {
   if (!recipe) return null
 
   return (
-    <details className="mt-3 border-t border-slate-600/70 pt-3">
-      <summary className="cursor-pointer list-none text-[11px] font-heading font-semibold uppercase tracking-widest text-emerald-400">
-        {label}
+    <details open={defaultOpen} className="group mt-3 border-t border-slate-600/70 pt-3">
+      <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl bg-slate-800/70 px-3 py-2 text-[11px] font-heading font-semibold uppercase tracking-widest text-emerald-300 transition-colors hover:bg-slate-800">
+        <span>{label}</span>
+        <ChevronDown size={15} className="transition-transform group-open:rotate-180" />
       </summary>
       <div className="mt-3 space-y-3">
         <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
@@ -389,7 +390,7 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
               </button>
               {m.recipe && (
                 <div className="basis-full">
-                  <RecipeDetails recipe={m.recipe} label="Meal recipe" />
+                  <RecipeDetails recipe={m.recipe} label="Meal recipe" defaultOpen />
                 </div>
               )}
             </div>
@@ -425,37 +426,14 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
         </div>
         <div className="p-4 space-y-2">
           <p className="text-slate-500 text-xs italic">Tip: Mix & match. Swap a salmon lunch for chicken if needed.</p>
-          {[...(MEALS[libraryTab] ?? []), ...(state.customItems?.meals?.[libraryTab] ?? [])].map((meal) => (
-            <div key={meal.id} className="bg-slate-700 rounded-xl p-3">
-              <div className="flex items-start gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="text-white text-sm font-medium">{meal.name}</div>
-                  <div className="text-slate-400 text-xs mt-0.5">{meal.desc}</div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs">
-                    <span className="text-emerald-400">{meal.kcal} kcal</span>
-                    <span className="text-blue-400">{meal.protein}g P</span>
-                    <span className="text-amber-400">{meal.carbs}g C</span>
-                    <span className="text-red-400">{meal.fat}g F</span>
-                  </div>
-                  <MeasurementPreview measurement={meal.recipe?.measurement} />
-                </div>
-                <button onClick={() => { addFromLibrary(meal); setShowLibrary(false) }}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium flex-shrink-0">
-                  Add
-                </button>
-                {meal.custom && (
-                  <button onClick={() => { removeCustomItem('meals', meal.id, libraryTab); showToast('Meal library item deleted') }}
-                    className="bg-red-500/15 text-red-300 rounded-lg px-2 py-1.5 flex-shrink-0">
-                    <Trash2 size={13} />
-                  </button>
-                )}
-              </div>
-              <RecipeDetails recipe={meal.recipe} />
-            </div>
-          ))}
           <div className="bg-slate-700/60 rounded-xl p-3 space-y-2">
-            <div className="text-slate-400 text-[10px] uppercase tracking-widest font-heading">Add Custom Meal</div>
-            <div className="text-emerald-300 text-[10px] uppercase tracking-widest font-heading">Recipe + raw/cooked measurement</div>
+            <div className="flex items-center gap-2">
+              <Plus size={14} className="text-emerald-300" />
+              <div>
+                <div className="text-slate-300 text-[10px] uppercase tracking-widest font-heading">Add Custom Meal</div>
+                <div className="text-emerald-300 text-[10px] uppercase tracking-widest font-heading">Recipe + raw/cooked measurement</div>
+              </div>
+            </div>
             <input value={libraryForm.name} onChange={(e) => setLibraryForm({ ...libraryForm, name: e.target.value })}
               placeholder="Meal name" className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500" />
             <input value={libraryForm.desc} onChange={(e) => setLibraryForm({ ...libraryForm, desc: e.target.value })}
@@ -495,6 +473,34 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
               Add to {libraryTab}
             </button>
           </div>
+          {[...(MEALS[libraryTab] ?? []), ...(state.customItems?.meals?.[libraryTab] ?? [])].map((meal) => (
+            <div key={meal.id} className="bg-slate-700 rounded-xl p-3">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-white text-sm font-medium">{meal.name}</div>
+                  <div className="text-slate-400 text-xs mt-0.5">{meal.desc}</div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs">
+                    <span className="text-emerald-400">{meal.kcal} kcal</span>
+                    <span className="text-blue-400">{meal.protein}g P</span>
+                    <span className="text-amber-400">{meal.carbs}g C</span>
+                    <span className="text-red-400">{meal.fat}g F</span>
+                  </div>
+                  <MeasurementPreview measurement={meal.recipe?.measurement} />
+                </div>
+                <button onClick={() => { addFromLibrary(meal); setShowLibrary(false) }}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium flex-shrink-0">
+                  Add
+                </button>
+                {meal.custom && (
+                  <button onClick={() => { removeCustomItem('meals', meal.id, libraryTab); showToast('Meal library item deleted') }}
+                    className="bg-red-500/15 text-red-300 rounded-lg px-2 py-1.5 flex-shrink-0">
+                    <Trash2 size={13} />
+                  </button>
+                )}
+              </div>
+              <RecipeDetails recipe={meal.recipe} />
+            </div>
+          ))}
         </div>
       </Modal>
 
