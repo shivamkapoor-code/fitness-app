@@ -238,4 +238,4 @@ export const MEALS = Object.fromEntries(
   ])
 )
 
-export const MACRO_TARGETS = { kcal: 2200, protein: 185, carbs: 220, fat: 62 }
+export const MACRO_TARGETS = { kcal: 2100, protein: 185, carbs: 200, fat: 62 }

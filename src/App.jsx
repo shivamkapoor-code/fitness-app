@@ -93,6 +93,7 @@ export default function App() {
       case 'workout':
         return <Workout state={state} logSet={logSet} removeSet={removeSet}
                  advanceQueue={advanceQueue} swapQueueDay={swapQueueDay} today={today}
+                 addMeal={addMeal}
                  addCustomItem={addCustomItem} removeCustomItem={removeCustomItem} />
       case 'nutrition':
         return <Nutrition state={state} addMeal={addMeal}

@@ -3,6 +3,7 @@ import { Plus, Trash2, Camera, Barcode, PenLine, BookOpen, Loader2, RefreshCw, C
 import { MacroRings } from '../components/MacroRings'
 import { Modal } from '../components/Modal'
 import { MEALS, MACRO_TARGETS } from '../data/meals'
+import { WORKOUT_SPLIT } from '../data/workouts'
 import { showToast } from '../utils/toast'
 import { analyzePhoto, getAIInsight } from '../ai/claude'
 import { BrowserMultiFormatReader } from '@zxing/browser'
@@ -13,6 +14,7 @@ const PHOTO_JPEG_QUALITY = 0.82
 const STATIC_MEALS = Object.values(MEALS).flat()
 const STATIC_MEALS_BY_ID = Object.fromEntries(STATIC_MEALS.map((meal) => [meal.id, meal]))
 const STATIC_MEALS_BY_NAME = Object.fromEntries(STATIC_MEALS.map((meal) => [meal.name.toLowerCase(), meal]))
+const MEAL_BY_ID = Object.fromEntries(STATIC_MEALS.map((meal) => [meal.id, meal]))
 const EMPTY_RECIPE_FORM = {
   name: '',
   desc: '',
@@ -37,6 +39,25 @@ function inferLibraryMealId(meal) {
 
 function getAllCustomMeals(customMeals = {}) {
   return Object.values(customMeals).flat()
+}
+
+function getWorkoutMealEntries(workout) {
+  const plan = workout?.mealPlan ?? {}
+  return ['breakfast', 'lunch', 'dinner', 'snack']
+    .flatMap((slot) => (plan[slot] ?? []).map((id) => ({ slot, meal: MEAL_BY_ID[id] })))
+    .filter((entry) => entry.meal)
+}
+
+function sumMealEntries(entries) {
+  return entries.reduce(
+    (acc, { meal }) => ({
+      kcal: acc.kcal + (meal.kcal ?? 0),
+      protein: acc.protein + (meal.protein ?? 0),
+      carbs: acc.carbs + (meal.carbs ?? 0),
+      fat: acc.fat + (meal.fat ?? 0),
+    }),
+    { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  )
 }
 
 function attachRecipeToLoggedMeal(meal, customMeals) {
@@ -182,6 +203,9 @@ async function preparePhotoForAI(file) {
 export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, removeCustomItem }) {
   const totals = state.nutrition[today]?.totals ?? { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   const meals = (state.nutrition[today]?.meals ?? []).map((meal) => attachRecipeToLoggedMeal(meal, state.customItems?.meals))
+  const currentWorkout = WORKOUT_SPLIT[state.workoutQueue.seq[state.workoutQueue.idx]]
+  const workoutMealEntries = getWorkoutMealEntries(currentWorkout)
+  const workoutMealTotals = sumMealEntries(workoutMealEntries)
 
   const [showLibrary, setShowLibrary] = useState(false)
   const [showManual, setShowManual] = useState(false)
@@ -372,6 +396,30 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
         )})}
       </div>
       <input ref={photoRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload} className="hidden" />
+
+      {workoutMealEntries.length > 0 && (
+        <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="font-heading text-sm font-semibold text-emerald-300 uppercase tracking-widest">Recommended For {currentWorkout.shortName}</h3>
+              <p className="text-slate-500 text-xs mt-1">{currentWorkout.mealPlan.note}</p>
+            </div>
+            <div className="text-right text-[10px] text-slate-400 whitespace-nowrap">
+              {workoutMealTotals.kcal} kcal<br />{workoutMealTotals.protein}g P
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {workoutMealEntries.map(({ slot, meal }) => (
+              <button key={`${slot}-${meal.id}`} onClick={() => addFromLibrary(meal)}
+                className="rounded-xl bg-slate-700/70 p-2 text-left hover:bg-slate-700 transition-colors">
+                <div className="text-[9px] uppercase tracking-widest text-slate-500 font-heading">{slot}</div>
+                <div className="text-white text-xs font-medium truncate">{meal.name}</div>
+                <div className="text-slate-400 text-[10px]">{meal.kcal} kcal · {meal.protein}g P</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Logged meals */}
       {meals.length > 0 && (

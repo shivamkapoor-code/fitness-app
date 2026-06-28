@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Info, RefreshCw, Plus, Trash2, ArrowUpDown, Loader2, CheckCircle2, AlertTriangle, ExternalLink, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { ChevronDown, ChevronUp, Info, RefreshCw, Plus, Trash2, ArrowUpDown, Loader2, CheckCircle2, AlertTriangle, ExternalLink, TrendingUp, TrendingDown, Minus, Utensils } from 'lucide-react'
 import { Modal } from '../components/Modal'
 import { RestTimer } from '../components/RestTimer'
 import { WORKOUT_SPLIT } from '../data/workouts'
+import { MEALS } from '../data/meals'
 import { EXERCISE_CUES } from '../data/exercises'
 import { calcProgressiveOverload } from '../utils/progressiveOverload'
 import { getAIInsight } from '../ai/claude'
@@ -10,6 +11,30 @@ import { showToast } from '../utils/toast'
 
 const RPE_OPTIONS = [6, 7, 8, 9, 10]
 const RPE_LABELS = { 6: 'Easy', 7: 'Moderate', 8: 'Hard', 9: 'Very Hard', 10: 'Max' }
+const MEAL_BY_ID = Object.fromEntries(Object.values(MEALS).flat().map((meal) => [meal.id, meal]))
+
+function getFormVideoUrl(exerciseName, cues) {
+  return cues?.youtubeUrl ?? `https://www.youtube.com/results?search_query=${encodeURIComponent(`${exerciseName} gym form tutorial`)}`
+}
+
+function getWorkoutMeals(workout) {
+  const plan = workout.mealPlan ?? {}
+  return ['breakfast', 'lunch', 'dinner', 'snack']
+    .flatMap((slot) => (plan[slot] ?? []).map((id) => ({ slot, meal: MEAL_BY_ID[id] })))
+    .filter((entry) => entry.meal)
+}
+
+function sumMeals(entries) {
+  return entries.reduce(
+    (acc, { meal }) => ({
+      kcal: acc.kcal + (meal.kcal ?? 0),
+      protein: acc.protein + (meal.protein ?? 0),
+      carbs: acc.carbs + (meal.carbs ?? 0),
+      fat: acc.fat + (meal.fat ?? 0),
+    }),
+    { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  )
+}
 
 function TagBadge({ tag }) {
   const colors = {
@@ -41,6 +66,7 @@ function ExerciseCard({ exercise, workoutLog, today, logSet, removeSet, state, i
   const todaySets = workoutLog[today]?.[exercise.name] ?? []
   const overload = calcProgressiveOverload(workoutLog, exercise.name)
   const cues = EXERCISE_CUES[exercise.name]
+  const formVideoUrl = getFormVideoUrl(exercise.name, cues)
 
   function addSet() {
     if (!weight || !reps) { showToast('Enter weight and reps', 'warn'); return }
@@ -189,6 +215,10 @@ function ExerciseCard({ exercise, workoutLog, today, logSet, removeSet, state, i
                 <Info size={12} /> Form
               </button>
             )}
+            <a href={formVideoUrl} target="_blank" rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl py-2 text-xs font-medium">
+              <ExternalLink size={12} /> Video
+            </a>
             {!isCore && (
               <button onClick={() => { setShowReplace(true); if (!replacement) getAIReplacement() }}
                 className="flex-1 flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl py-2 text-xs font-medium">
@@ -395,7 +425,85 @@ Based on this data, give me a readiness verdict and brief guidance. Your respons
   )
 }
 
-export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, today, addCustomItem, removeCustomItem }) {
+function DayPlanCard({ workout, today, addMeal }) {
+  const mealEntries = getWorkoutMeals(workout)
+  const totals = sumMeals(mealEntries)
+  const targets = workout.dailyTargets
+
+  function addRecommendedMeal(meal) {
+    addMeal(today, {
+      ...meal,
+      sourceId: meal.id,
+      id: `workout_rec_${meal.id}`,
+    })
+    showToast(`${meal.name} added`)
+  }
+
+  return (
+    <div className="bg-slate-800 rounded-2xl p-4 space-y-4">
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="font-heading text-sm font-semibold text-white uppercase tracking-widest">Today's Plan</h3>
+            <p className="text-slate-400 text-xs mt-1">{workout.goal}</p>
+          </div>
+          <span className="rounded-xl bg-emerald-500/15 px-3 py-1 text-emerald-300 text-xs font-heading font-semibold whitespace-nowrap">
+            {workout.duration}
+          </span>
+        </div>
+      </div>
+
+      {targets && (
+        <div className="grid grid-cols-5 gap-1.5">
+          {[
+            ['kcal', targets.kcal],
+            ['P', `${targets.protein}g`],
+            ['C', `${targets.carbs}g`],
+            ['F', `${targets.fat}g`],
+            ['steps', targets.steps],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-xl bg-slate-700/70 p-2 text-center">
+              <div className="font-heading text-xs font-bold text-white">{value}</div>
+              <div className="text-slate-500 text-[9px] uppercase">{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {mealEntries.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Utensils size={15} className="text-emerald-400" />
+              <div>
+                <div className="font-heading text-xs font-semibold text-emerald-300 uppercase tracking-widest">{workout.mealPlan.title}</div>
+                <div className="text-slate-500 text-[10px]">{totals.kcal} kcal · {totals.protein}g P · {totals.carbs}g C · {totals.fat}g F</div>
+              </div>
+            </div>
+          </div>
+          <p className="text-slate-400 text-xs">{workout.mealPlan.note}</p>
+          <div className="space-y-2">
+            {mealEntries.map(({ slot, meal }) => (
+              <div key={`${slot}-${meal.id}`} className="flex items-center gap-2 rounded-xl bg-slate-700/60 p-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] uppercase tracking-widest text-slate-500 font-heading">{slot}</div>
+                  <div className="text-white text-xs font-medium truncate">{meal.name}</div>
+                  <div className="text-slate-400 text-[10px]">{meal.kcal} kcal · {meal.protein}g P · {meal.carbs}g C · {meal.fat}g F</div>
+                </div>
+                <button onClick={() => addRecommendedMeal(meal)}
+                  className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-white text-xs font-medium">
+                  Add
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, today, addMeal, addCustomItem, removeCustomItem }) {
   const [showSwap, setShowSwap] = useState(false)
   const [showWarmup, setShowWarmup] = useState(false)
   const [exerciseForm, setExerciseForm] = useState({ name: '', sets: '', repsRange: '', rest: '' })
@@ -445,6 +553,8 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
 
       {/* Pre-session readiness assessment */}
       <ReadinessCard state={state} workout={workout} today={today} />
+
+      <DayPlanCard workout={workout} today={today} addMeal={addMeal} />
 
       {/* Stiffness alert */}
       {stiffness >= 4 && (
@@ -558,7 +668,7 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
       {/* Core */}
       {workout.core?.length > 0 && (
         <div className="space-y-3">
-          <h3 className="font-heading text-sm font-semibold text-purple-400 uppercase tracking-widest">Core & Stability</h3>
+          <h3 className="font-heading text-sm font-semibold text-purple-400 uppercase tracking-widest">Abs & Core Stability</h3>
           {workout.core.map((ex) => (
             <ExerciseCard
               key={ex.name}
@@ -578,7 +688,7 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
       {workout.cardio && (
         <div className={`rounded-2xl p-4 ${workout.cardio.type === 'mandatory' ? 'bg-blue-500/10 border border-blue-500/20' : workout.cardio.type === 'conditional' ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-slate-800'}`}>
           <div className={`font-heading text-sm font-semibold uppercase tracking-widest mb-1 ${workout.cardio.type === 'mandatory' ? 'text-blue-400' : workout.cardio.type === 'conditional' ? 'text-amber-400' : 'text-slate-400'}`}>
-            Cardio {workout.cardio.type === 'mandatory' ? '(MANDATORY)' : workout.cardio.type === 'optional' ? '(Optional)' : '(Conditional)'}
+            Cardio {workout.cardio.type === 'mandatory' ? '(Needed Today)' : workout.cardio.type === 'optional' ? '(Optional)' : workout.cardio.type === 'none' ? '(Not Planned)' : '(Conditional)'}
           </div>
           <p className="text-slate-300 text-sm">{workout.cardio.desc}</p>
         </div>
