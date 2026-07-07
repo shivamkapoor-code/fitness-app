@@ -1,6 +1,6 @@
-import { WORKOUT_SPLIT } from '../data/workouts'
-import { MACRO_TARGETS } from '../data/meals'
-import { calcInflamScore } from './bioAge'
+import { WORKOUT_SPLIT } from '../data/workouts.js'
+import { MACRO_TARGETS } from '../data/meals.js'
+import { calcInflamScore } from './bioAge.js'
 
 export const DEFAULT_PLAN_PREFERENCES = {
   goal: 'Body recomposition: build visible muscle while reducing visceral fat',
@@ -41,6 +41,28 @@ export function getDateWindow(today, days) {
 
 export function getWorkoutByDay(day) {
   return WORKOUT_SPLIT.find((workout) => workout.day === day) ?? WORKOUT_SPLIT[0]
+}
+
+export function moveWorkoutToToday(queue, selectedSeqIdx) {
+  const seq = queue?.seq ?? []
+  if (seq.length === 0) return queue
+  if (selectedSeqIdx === queue.idx) return { ...queue }
+
+  const currentIdx = queue.idx ?? 0
+  const selectedDay = seq[selectedSeqIdx]
+  if (selectedDay == null) return { ...queue }
+
+  const orderedFromToday = seq.map((_, offset) => seq[(currentIdx + offset) % seq.length])
+  const nextSeq = [
+    selectedDay,
+    ...orderedFromToday.filter((day) => day !== selectedDay),
+  ]
+
+  return {
+    ...queue,
+    seq: nextSeq,
+    idx: 0,
+  }
 }
 
 export function getTodayWorkoutState(state, today) {

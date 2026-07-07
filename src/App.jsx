@@ -49,6 +49,7 @@ export default function App() {
     toggleSupp, saveInflam,
     setStiffness,
     advanceQueue, swapQueueDay,
+    clearWorkoutCompletion,
     addChatMessage,
     addCustomItem, removeCustomItem,
   } = useAppState(null)
@@ -100,6 +101,7 @@ export default function App() {
       case 'workout':
         return <Workout state={state} logSet={logSet} removeSet={removeSet}
                  advanceQueue={advanceQueue} swapQueueDay={swapQueueDay} today={today}
+                 clearWorkoutCompletion={clearWorkoutCompletion}
                  addMeal={addMeal}
                  addCustomItem={addCustomItem} removeCustomItem={removeCustomItem}
                  onNavigate={setScreen} />

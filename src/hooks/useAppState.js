@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { moveWorkoutToToday } from '../utils/trainingInsights'
 
 const STORAGE_KEY = 'shivam_fitness_v1'
 
@@ -399,9 +400,28 @@ export function useAppState(userId) {
 
   const swapQueueDay = useCallback((fromIdx, toIdx) => {
     setState((prev) => {
-      const seq = [...prev.workoutQueue.seq]
-      ;[seq[fromIdx], seq[toIdx]] = [seq[toIdx], seq[fromIdx]]
-      return { ...prev, workoutQueue: { ...prev.workoutQueue, seq } }
+      if (fromIdx === toIdx) return prev
+      return { ...prev, workoutQueue: moveWorkoutToToday(prev.workoutQueue, toIdx) }
+    })
+  }, [])
+
+  const clearWorkoutCompletion = useCallback((date) => {
+    setState((prev) => {
+      const completion = prev.workoutCompletions?.[date]
+      if (!completion) return prev
+
+      const nextCompletions = { ...(prev.workoutCompletions ?? {}) }
+      delete nextCompletions[date]
+
+      const completedIdx = prev.workoutQueue.seq.indexOf(completion.day)
+
+      return {
+        ...prev,
+        workoutCompletions: nextCompletions,
+        workoutQueue: completedIdx >= 0
+          ? { ...prev.workoutQueue, idx: completedIdx, lastDate: null }
+          : prev.workoutQueue,
+      }
     })
   }, [])
 
@@ -430,6 +450,7 @@ export function useAppState(userId) {
     setStiffness,
     advanceQueue,
     swapQueueDay,
+    clearWorkoutCompletion,
     addChatMessage,
   }
 }

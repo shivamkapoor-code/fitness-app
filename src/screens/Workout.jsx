@@ -504,7 +504,7 @@ function DayPlanCard({ workout, today, addMeal }) {
   )
 }
 
-function CompletedSession({ state, today, completion, onNavigate }) {
+function CompletedSession({ state, today, completion, onNavigate, clearWorkoutCompletion }) {
   const completedWorkout = getWorkoutByDay(completion.day)
   const nextWorkout = WORKOUT_SPLIT[state.workoutQueue.seq[state.workoutQueue.idx]]
   const stats = getSessionStats(state, today, completedWorkout)
@@ -542,10 +542,13 @@ function CompletedSession({ state, today, completion, onNavigate }) {
           <button onClick={() => onNavigate('dashboard')} className="btn-primary rounded-xl py-3 text-sm">
             Home
           </button>
-          <button onClick={() => onNavigate('nutrition')} className="btn-ghost rounded-xl py-3 text-sm font-heading font-semibold uppercase tracking-wider">
-            Log Food
+          <button onClick={() => clearWorkoutCompletion(today)} className="btn-ghost rounded-xl py-3 text-sm font-heading font-semibold uppercase tracking-wider">
+            Reopen
           </button>
         </div>
+        <button onClick={() => onNavigate('nutrition')} className="w-full rounded-xl border border-slate-700 py-3 text-sm font-heading font-semibold uppercase tracking-wider text-slate-300">
+          Log Food
+        </button>
       </div>
 
       <div className="rounded-2xl bg-slate-800 p-4">
@@ -593,7 +596,40 @@ function SessionGuide({ workout, allExercises, state, today }) {
   )
 }
 
-export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, today, addMeal, addCustomItem, removeCustomItem, onNavigate }) {
+function CompletionPanel({ canComplete, sessionStats, workout, onComplete }) {
+  const isRecovery = (workout.exercises?.length ?? 0) === 0
+  const title = isRecovery ? 'Complete Recovery Day' : 'Complete Session'
+  const detail = canComplete
+    ? isRecovery
+      ? 'Mark this recovery work done when the cardio or mobility is actually complete.'
+      : `${sessionStats.totalSets} sets logged. Finish only when you are done training, not just done planning.`
+    : 'Log at least one working set before completing this strength session.'
+
+  return (
+    <div className={`rounded-2xl border p-4 space-y-3 ${canComplete ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-slate-700 bg-slate-800'}`}>
+      <div className="flex items-start gap-3">
+        <CheckCircle2 size={18} className={canComplete ? 'mt-0.5 text-emerald-300' : 'mt-0.5 text-slate-500'} />
+        <div className="flex-1">
+          <div className="font-heading text-sm font-semibold uppercase tracking-widest text-white">{title}</div>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400">{detail}</p>
+        </div>
+      </div>
+      <button
+        onClick={onComplete}
+        disabled={!canComplete}
+        className={`w-full rounded-xl py-3 text-sm font-heading font-semibold uppercase tracking-wider ${
+          canComplete
+            ? 'btn-primary'
+            : 'cursor-not-allowed border border-slate-700 bg-slate-900 text-slate-600'
+        }`}
+      >
+        {title}
+      </button>
+    </div>
+  )
+}
+
+export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, today, addMeal, addCustomItem, removeCustomItem, clearWorkoutCompletion, onNavigate }) {
   const [showSwap, setShowSwap] = useState(false)
   const [showWarmup, setShowWarmup] = useState(false)
   const [exerciseForm, setExerciseForm] = useState({ name: '', sets: '', repsRange: '', rest: '' })
@@ -603,7 +639,7 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
   const stiffness = state.morningStiffness[today] ?? null
 
   if (completion) {
-    return <CompletedSession state={state} today={today} completion={completion} onNavigate={onNavigate} />
+    return <CompletedSession state={state} today={today} completion={completion} onNavigate={onNavigate} clearWorkoutCompletion={clearWorkoutCompletion} />
   }
 
   const currentDayIdx = queue.seq[queue.idx]
@@ -611,6 +647,8 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
   const workoutKey = String(workout.day)
   const customExercises = state.customItems?.workoutExercises?.[workoutKey] ?? []
   const allExercises = [...(workout.exercises ?? []), ...customExercises]
+  const sessionStats = getSessionStats(state, today, { ...workout, exercises: allExercises })
+  const canComplete = allExercises.length === 0 || sessionStats.totalSets > 0
 
   function addCustomExercise() {
     if (!exerciseForm.name.trim()) { showToast('Enter an exercise name', 'warn'); return }
@@ -633,6 +671,10 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
   })
 
   function markComplete() {
+    if (!canComplete) {
+      showToast('Log at least one working set before completing', 'warn')
+      return
+    }
     advanceQueue(today, workout.day)
     showToast(`${workout.name} complete! Queue advanced.`)
   }
@@ -641,10 +683,9 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
     <div className="px-4 py-4 pb-20 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-2xl font-bold text-white tracking-wide">{workout.name}</h1>
-        <button onClick={markComplete} className="flex items-center gap-1.5 bg-emerald-600 text-white rounded-xl px-3 py-2 text-xs font-semibold">
-          <CheckCircle2 size={14} />
-          Done
-        </button>
+        <span className="rounded-xl bg-slate-800 px-3 py-2 text-xs font-heading font-semibold text-slate-300">
+          {workout.duration}
+        </span>
       </div>
 
       {/* Pre-session readiness assessment */}
@@ -652,6 +693,7 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
 
       <DayPlanCard workout={workout} today={today} addMeal={addMeal} />
       <SessionGuide workout={workout} allExercises={allExercises} state={state} today={today} />
+      <CompletionPanel canComplete={canComplete} sessionStats={sessionStats} workout={workout} onComplete={markComplete} />
 
       {/* Stiffness alert */}
       {stiffness >= 4 && (
@@ -799,9 +841,9 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
       )}
 
       {/* Swap modal */}
-      <Modal open={showSwap} onClose={() => setShowSwap(false)} title="Reorder Queue">
+      <Modal open={showSwap} onClose={() => setShowSwap(false)} title="Move Workout To Today">
         <div className="p-4 space-y-2">
-          <p className="text-slate-400 text-xs mb-3">Tap two workouts to swap their positions in the queue.</p>
+          <p className="text-slate-400 text-xs mb-3">Pick the workout you are actually doing today. The workout you displaced becomes next, so the plan does not forget it tomorrow.</p>
           {queue.seq.map((dayNum, seqIdx) => {
             const w = WORKOUT_SPLIT[dayNum]
             const isToday = seqIdx === queue.idx
@@ -810,10 +852,9 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
                 key={seqIdx}
                 onClick={() => {
                   if (!showSwap) return
-                  // Simple: swap current with selected
                   if (seqIdx !== queue.idx) {
                     swapQueueDay(queue.idx, seqIdx)
-                    showToast('Queue reordered')
+                    showToast(`${w.name} moved to today`)
                     setShowSwap(false)
                   }
                 }}
@@ -825,7 +866,7 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
               </button>
             )
           })}
-          <p className="text-slate-500 text-xs text-center mt-2">Tap any workout to move it to today's position</p>
+          <p className="text-slate-500 text-xs text-center mt-2">This is a pull-forward, not a delete or skip.</p>
         </div>
       </Modal>
     </div>
