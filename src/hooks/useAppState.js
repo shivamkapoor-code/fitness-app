@@ -36,6 +36,7 @@ function normaliseState(saved) {
     suppChecks: saved?.suppChecks ?? {},
     inflam: saved?.inflam ?? {},
     workoutQueue: saved?.workoutQueue ?? defaultQueue,
+    workoutCompletions: saved?.workoutCompletions ?? {},
     morningStiffness: saved?.morningStiffness ?? {},
     customItems: {
       ...defaultCustomItems,
@@ -376,13 +377,22 @@ export function useAppState(userId) {
   }, [])
 
   // Queue operations
-  const advanceQueue = useCallback(() => {
+  const advanceQueue = useCallback((date = today, workoutDay = null) => {
     setState((prev) => {
       const q = prev.workoutQueue
-      const nextIdx = (q.idx + 1) % q.seq.length
+      const completedDay = workoutDay ?? q.seq[q.idx]
+      const alreadyCompleted = Boolean(prev.workoutCompletions?.[date])
+      const nextIdx = alreadyCompleted ? q.idx : (q.idx + 1) % q.seq.length
       return {
         ...prev,
-        workoutQueue: { ...q, idx: nextIdx, lastDate: today },
+        workoutCompletions: {
+          ...(prev.workoutCompletions ?? {}),
+          [date]: {
+            day: completedDay,
+            completedAt: prev.workoutCompletions?.[date]?.completedAt ?? Date.now(),
+          },
+        },
+        workoutQueue: { ...q, idx: nextIdx, lastDate: date },
       }
     })
   }, [today])

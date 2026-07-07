@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Download, Upload, Info, Smartphone, User } from 'lucide-react'
+import { Download, Upload, Info, Smartphone, User, Target, ShieldCheck } from 'lucide-react'
 import { showToast } from '../utils/toast'
+import { normalisePlanPreferences } from '../utils/trainingInsights'
 
 export function Settings({ state, update, user, updateProfile, signOut, isAdmin, onNavigate }) {
   const [displayNameInput, setDisplayNameInput] = useState(user?.display_name ?? '')
   const [usernameInput, setUsernameInput] = useState(user?.username ?? '')
   const [ageInput, setAgeInput] = useState(user?.actual_age ? String(user.actual_age) : '')
+  const [planPrefs, setPlanPrefs] = useState(normalisePlanPreferences(user?.plan_preferences))
 
   async function saveProfile() {
     const username = usernameInput.trim().toLowerCase()
@@ -18,13 +20,16 @@ export function Settings({ state, update, user, updateProfile, signOut, isAdmin,
       showToast('Age must be a whole number from 16 to 80', 'warn')
       return
     }
+    const normalisedPrefs = normalisePlanPreferences(planPrefs)
 
     try {
       await updateProfile({
         display_name: displayName,
         username,
         actual_age: actualAge,
+        plan_preferences: normalisedPrefs,
       })
+      setPlanPrefs(normalisedPrefs)
       showToast('Profile updated')
     } catch (e) {
       showToast(e.message, 'error')
@@ -147,6 +152,82 @@ export function Settings({ state, update, user, updateProfile, signOut, isAdmin,
         </div>
       </div>
 
+      {/* Plan preferences */}
+      <div className="glass" style={{ padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Target size={16} className="text-emerald-400" />
+          <h3 className="font-heading text-sm font-semibold text-primary-color uppercase tracking-widest">Plan Preferences</h3>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <div className="text-muted-color text-xs mb-2">Goal</div>
+            <input
+              type="text"
+              value={planPrefs.goal}
+              onChange={(e) => setPlanPrefs({ ...planPrefs, goal: e.target.value })}
+              className="w-full glass-elevated border border-slate-600 rounded-xl px-3 py-2.5 text-primary-color text-sm focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="text-muted-color text-xs mb-2">Level</div>
+              <select
+                value={planPrefs.level}
+                onChange={(e) => setPlanPrefs({ ...planPrefs, level: e.target.value })}
+                className="w-full glass-elevated border border-slate-600 rounded-xl px-3 py-2.5 text-primary-color text-sm focus:outline-none focus:border-emerald-500"
+              >
+                <option>Beginner</option>
+                <option>Intermediate</option>
+                <option>Advanced</option>
+              </select>
+            </div>
+            <div>
+              <div className="text-muted-color text-xs mb-2">Equipment</div>
+              <select
+                value={planPrefs.equipment}
+                onChange={(e) => setPlanPrefs({ ...planPrefs, equipment: e.target.value })}
+                className="w-full glass-elevated border border-slate-600 rounded-xl px-3 py-2.5 text-primary-color text-sm focus:outline-none focus:border-emerald-500"
+              >
+                <option>Full gym</option>
+                <option>Dumbbells only</option>
+                <option>Bodyweight</option>
+                <option>Home gym</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="text-muted-color text-xs mb-2">Training Days / Week</div>
+              <input
+                type="number"
+                min="1"
+                max="7"
+                value={planPrefs.weekly_training_days}
+                onChange={(e) => setPlanPrefs({ ...planPrefs, weekly_training_days: e.target.value })}
+                className="w-full glass-elevated border border-slate-600 rounded-xl px-3 py-2.5 text-primary-color text-sm focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <div className="text-muted-color text-xs mb-2">Session Minutes</div>
+              <input
+                type="number"
+                min="20"
+                max="120"
+                value={planPrefs.session_minutes}
+                onChange={(e) => setPlanPrefs({ ...planPrefs, session_minutes: e.target.value })}
+                className="w-full glass-elevated border border-slate-600 rounded-xl px-3 py-2.5 text-primary-color text-sm focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          </div>
+          <p className="text-muted-color text-xs leading-relaxed">
+            Home uses these preferences to explain today’s plan and consistency target. The workout split itself stays intentionally fixed until there is enough logged history to justify regenerating it.
+          </p>
+          <button onClick={saveProfile} className="btn-primary" style={{ width: '100%', padding: '10px 0', fontSize: 13, cursor: 'pointer' }}>
+            Save Preferences
+          </button>
+        </div>
+      </div>
+
       {/* Data stats */}
       <div className="glass" style={{ padding: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -164,6 +245,19 @@ export function Settings({ state, update, user, updateProfile, signOut, isAdmin,
               <div className="text-muted-color text-[10px] mt-0.5">{label}</div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Privacy */}
+      <div className="glass" style={{ padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <ShieldCheck size={16} className="text-emerald-400" />
+          <h3 className="font-heading text-sm font-semibold text-primary-color uppercase tracking-widest">Health Data Handling</h3>
+        </div>
+        <div className="space-y-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+          <p>Workout, nutrition, stiffness, and body metrics are stored locally in this browser unless Supabase is configured.</p>
+          <p>AI coaching is opt-in per button tap. Those requests send summarized fitness data, and photo scans send the selected image, to the configured Supabase Edge Function.</p>
+          <p>Exports include sensitive health/body data. Store JSON backups somewhere private.</p>
         </div>
       </div>
 

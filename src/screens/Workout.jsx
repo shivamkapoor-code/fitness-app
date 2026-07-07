@@ -8,6 +8,7 @@ import { EXERCISE_CUES } from '../data/exercises'
 import { calcProgressiveOverload } from '../utils/progressiveOverload'
 import { getAIInsight } from '../ai/claude'
 import { showToast } from '../utils/toast'
+import { getSessionStats, getWorkoutByDay } from '../utils/trainingInsights'
 
 const RPE_OPTIONS = [6, 7, 8, 9, 10]
 const RPE_LABELS = { 6: 'Easy', 7: 'Moderate', 8: 'Hard', 9: 'Very Hard', 10: 'Max' }
@@ -503,13 +504,108 @@ function DayPlanCard({ workout, today, addMeal }) {
   )
 }
 
-export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, today, addMeal, addCustomItem, removeCustomItem }) {
+function CompletedSession({ state, today, completion, onNavigate }) {
+  const completedWorkout = getWorkoutByDay(completion.day)
+  const nextWorkout = WORKOUT_SPLIT[state.workoutQueue.seq[state.workoutQueue.idx]]
+  const stats = getSessionStats(state, today, completedWorkout)
+
+  return (
+    <div className="px-4 py-4 pb-20 space-y-4">
+      <div className="rounded-2xl border border-emerald-500/35 bg-emerald-500/10 p-5 space-y-4">
+        <div className="flex items-start gap-3">
+          <CheckCircle2 size={22} className="mt-1 shrink-0 text-emerald-300" />
+          <div>
+            <div className="font-heading text-xs font-semibold uppercase tracking-widest text-emerald-300">Session Complete</div>
+            <h1 className="mt-1 font-heading text-3xl font-bold leading-none text-white">{completedWorkout.name}</h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-300">
+              Logged and locked for today. The queue is advanced, but Home will not ask you to train twice.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-xl bg-slate-950/50 p-3 text-center">
+            <div className="font-heading text-xl font-bold text-white">{stats.totalSets}</div>
+            <div className="text-[10px] text-slate-500">sets</div>
+          </div>
+          <div className="rounded-xl bg-slate-950/50 p-3 text-center">
+            <div className="font-heading text-xl font-bold text-white">{stats.loggedExercises}/{stats.plannedExerciseCount}</div>
+            <div className="text-[10px] text-slate-500">movements</div>
+          </div>
+          <div className="rounded-xl bg-slate-950/50 p-3 text-center">
+            <div className="font-heading text-xl font-bold text-white">{nextWorkout.shortName}</div>
+            <div className="text-[10px] text-slate-500">next</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => onNavigate('dashboard')} className="btn-primary rounded-xl py-3 text-sm">
+            Home
+          </button>
+          <button onClick={() => onNavigate('nutrition')} className="btn-ghost rounded-xl py-3 text-sm font-heading font-semibold uppercase tracking-wider">
+            Log Food
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-slate-800 p-4">
+        <div className="font-heading text-sm font-semibold uppercase tracking-widest text-slate-400">Next Recommendation</div>
+        <p className="mt-2 text-sm leading-relaxed text-slate-300">
+          Next up is {nextWorkout.name}. Use tomorrow’s stiffness check before deciding whether to push, maintain, or modify it.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function SessionGuide({ workout, allExercises, state, today }) {
+  const plannedExercises = [...allExercises, ...(workout.core ?? [])]
+  const stats = getSessionStats(state, today, { ...workout, exercises: allExercises })
+  const nextExercise = plannedExercises.find((exercise) => (state.workoutLog[today]?.[exercise.name] ?? []).length === 0)
+  const progressLabel = stats.plannedExerciseCount > 0
+    ? `${stats.loggedExercises}/${stats.plannedExerciseCount} movements`
+    : workout.cardio?.desc ?? 'Recovery day'
+
+  return (
+    <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-heading text-xs font-semibold uppercase tracking-widest text-emerald-300">Guided Session</div>
+          <p className="mt-1 text-sm leading-relaxed text-slate-300">
+            {nextExercise
+              ? `Next: ${nextExercise.name}. Log the first working set, then rest ${nextExercise.rest ?? 90}s.`
+              : stats.totalSets > 0
+                ? 'All planned movements have logged work. Review your sets, then mark the workout done.'
+                : 'Use this as a recovery session. Follow the mobility/cardio plan and mark done when complete.'}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-lg bg-slate-950/40 px-2.5 py-1 text-xs font-heading font-semibold text-white">
+          {progressLabel}
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-900/70">
+        <div
+          className="h-full rounded-full bg-emerald-500"
+          style={{ width: `${stats.percentComplete}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, today, addMeal, addCustomItem, removeCustomItem, onNavigate }) {
   const [showSwap, setShowSwap] = useState(false)
   const [showWarmup, setShowWarmup] = useState(false)
   const [exerciseForm, setExerciseForm] = useState({ name: '', sets: '', repsRange: '', rest: '' })
 
   const queue = state.workoutQueue
+  const completion = state.workoutCompletions?.[today] ?? null
   const stiffness = state.morningStiffness[today] ?? null
+
+  if (completion) {
+    return <CompletedSession state={state} today={today} completion={completion} onNavigate={onNavigate} />
+  }
+
   const currentDayIdx = queue.seq[queue.idx]
   const workout = WORKOUT_SPLIT[currentDayIdx]
   const workoutKey = String(workout.day)
@@ -537,7 +633,7 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
   })
 
   function markComplete() {
-    advanceQueue()
+    advanceQueue(today, workout.day)
     showToast(`${workout.name} complete! Queue advanced.`)
   }
 
@@ -555,6 +651,7 @@ export function Workout({ state, logSet, removeSet, advanceQueue, swapQueueDay, 
       <ReadinessCard state={state} workout={workout} today={today} />
 
       <DayPlanCard workout={workout} today={today} addMeal={addMeal} />
+      <SessionGuide workout={workout} allExercises={allExercises} state={state} today={today} />
 
       {/* Stiffness alert */}
       {stiffness >= 4 && (

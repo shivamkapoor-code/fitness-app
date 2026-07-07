@@ -12,18 +12,25 @@ import { Inflammation } from './screens/Inflammation'
 import { AIChat } from './screens/AIChat'
 import { WeeklyReview } from './screens/WeeklyReview'
 import { Settings } from './screens/Settings'
+import { DEFAULT_PLAN_PREFERENCES, normalisePlanPreferences } from './utils/trainingInsights'
 
 const PROFILE_STORAGE_KEY = 'shivam_profile_v1'
 const DEFAULT_PROFILE = {
   display_name: 'Shivam',
   username: 'shivam',
   actual_age: null,
+  plan_preferences: DEFAULT_PLAN_PREFERENCES,
 }
 
 function loadProfile() {
   try {
     const raw = localStorage.getItem(PROFILE_STORAGE_KEY)
-    return raw ? { ...DEFAULT_PROFILE, ...JSON.parse(raw) } : DEFAULT_PROFILE
+    const parsed = raw ? JSON.parse(raw) : {}
+    return {
+      ...DEFAULT_PROFILE,
+      ...parsed,
+      plan_preferences: normalisePlanPreferences(parsed.plan_preferences),
+    }
   } catch {
     return DEFAULT_PROFILE
   }
@@ -94,7 +101,8 @@ export default function App() {
         return <Workout state={state} logSet={logSet} removeSet={removeSet}
                  advanceQueue={advanceQueue} swapQueueDay={swapQueueDay} today={today}
                  addMeal={addMeal}
-                 addCustomItem={addCustomItem} removeCustomItem={removeCustomItem} />
+                 addCustomItem={addCustomItem} removeCustomItem={removeCustomItem}
+                 onNavigate={setScreen} />
       case 'nutrition':
         return <Nutrition state={state} addMeal={addMeal}
                  removeMeal={removeMeal} today={today}
@@ -127,6 +135,7 @@ export default function App() {
   }
 
   const MAIN_SCREENS = ['dashboard','workout','nutrition','body','supplements','inflammation','chat']
+  const HAS_BACK_BUTTON = screen === 'review' || screen === 'settings' || screen === 'admin'
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg-base)' }}>
@@ -137,7 +146,11 @@ export default function App() {
         minHeight: '100dvh'
       }}>
         <ToastContainer />
-        <main style={{ minHeight: '100dvh', overflowY: 'auto' }}>
+        <main style={{
+          minHeight: '100dvh',
+          overflowY: 'auto',
+          paddingTop: HAS_BACK_BUTTON ? 44 : 0,
+        }}>
           {renderScreen()}
         </main>
 
@@ -147,7 +160,9 @@ export default function App() {
 
         {screen === 'dashboard' && (
           <div style={{
-            position: 'fixed', top: 16, right: 16,
+            position: 'fixed',
+            top: 16,
+            right: 'max(16px, calc((100vw - 480px) / 2 + 16px))',
             display: 'flex', gap: 8, zIndex: 20,
           }}>
             {isAdmin && (
@@ -199,8 +214,13 @@ export default function App() {
           </div>
         )}
 
-        {(screen === 'review' || screen === 'settings' || screen === 'admin') && (
-          <div style={{ position: 'fixed', top: 16, left: 16, zIndex: 20 }}>
+        {HAS_BACK_BUTTON && (
+          <div style={{
+            position: 'fixed',
+            top: 16,
+            left: 'max(16px, calc((100vw - 480px) / 2 + 16px))',
+            zIndex: 20,
+          }}>
             <button onClick={() => setScreen('dashboard')}
               style={{
                 background: 'var(--bg-surface)',
