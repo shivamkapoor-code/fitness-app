@@ -7,8 +7,7 @@ import { Dashboard } from './screens/Dashboard'
 import { Workout } from './screens/Workout'
 import { Nutrition } from './screens/Nutrition'
 import { BodyMetrics } from './screens/BodyMetrics'
-import { Supplements } from './screens/Supplements'
-import { Inflammation } from './screens/Inflammation'
+import { Recovery } from './screens/Recovery'
 import { AIChat } from './screens/AIChat'
 import { WeeklyReview } from './screens/WeeklyReview'
 import { Settings } from './screens/Settings'
@@ -113,12 +112,9 @@ export default function App() {
         return <BodyMetrics state={state} addBodyMetric={addBodyMetric}
                  removeBodyMetric={removeBodyMetric} addRenphoEntries={addRenphoEntries}
                  today={today} user={activeUser} />
-      case 'supplements':
-        return <Supplements state={state} toggleSupp={toggleSupp} today={today}
-                 addCustomItem={addCustomItem} removeCustomItem={removeCustomItem} />
-      case 'inflammation':
-        return <Inflammation state={state} saveInflam={saveInflam} today={today}
-                 addCustomItem={addCustomItem} removeCustomItem={removeCustomItem} />
+      case 'recovery':
+        return <Recovery state={state} saveInflam={saveInflam} toggleSupp={toggleSupp} today={today}
+                 addCustomItem={addCustomItem} removeCustomItem={removeCustomItem} user={activeUser} />
       case 'chat':
         return <AIChat state={state} addChatMessage={addChatMessage} today={today} />
       case 'review':
@@ -136,7 +132,7 @@ export default function App() {
     }
   }
 
-  const MAIN_SCREENS = ['dashboard','workout','nutrition','body','supplements','inflammation','chat']
+  const MAIN_SCREENS = ['dashboard','workout','nutrition','recovery','body','chat']
   const HAS_BACK_BUTTON = screen === 'review' || screen === 'settings' || screen === 'admin'
 
   return (

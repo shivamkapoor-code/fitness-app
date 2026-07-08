@@ -7,7 +7,7 @@ const QUICK_QUESTIONS = [
   'Why has my fat loss stalled?',
   'Am I eating enough protein?',
   'What should I eat today?',
-  'How is my inflammation?',
+  'How is my recovery?',
   'Should I train today?',
   'Analyse my week',
 ]
@@ -56,8 +56,8 @@ export function AIChat({ state, addChatMessage, today }) {
           <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
             <MessageCircle size={48} className="text-emerald-400 opacity-50" />
             <div>
-              <div className="font-heading text-xl font-bold text-white">Ask Your AI Coach</div>
-              <div className="text-slate-400 text-sm mt-1">Expert nutritionist + bodybuilder + physiotherapist</div>
+              <div className="font-heading text-xl font-bold text-white">Ask Your Coach</div>
+              <div className="text-slate-400 text-sm mt-1">Training, meals, recovery, and progress in one context</div>
             </div>
           </div>
         )}
@@ -111,7 +111,7 @@ export function AIChat({ state, addChatMessage, today }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
-            placeholder="Ask your AI coach..."
+            placeholder="Ask your coach..."
             className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-emerald-500"
           />
           <button

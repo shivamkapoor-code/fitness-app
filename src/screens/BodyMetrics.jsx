@@ -174,7 +174,7 @@ export function BodyMetrics({ state, addBodyMetric, removeBodyMetric, addRenphoE
     try {
       const latestStr = latest ? `Current: ${latest.weight}lbs, ${latest.bodyFat}% BF, visceral fat ${latest.visceralFat}` : 'No measurements yet'
       const text = await getAIInsight(
-        `${latestStr}. Biological age: ${bioAge}. Target: 175lbs, 15% BF, visceral fat <9. Give me root cause analysis of my current body composition and the most important intervention to reach my targets. 3-4 sentences, specific and actionable.`,
+        `${latestStr}. Functional trend index: ${bioAge}. Targets: 175lbs, 15% body fat, visceral fat under 9. Give me a cautious body-composition trend read and the most important next intervention. Do not diagnose or claim certainty. 3-4 sentences, specific and actionable.`,
         state,
         today
       )
@@ -192,7 +192,10 @@ export function BodyMetrics({ state, addBodyMetric, removeBodyMetric, addRenphoE
   return (
     <div className="px-4 py-4 pb-20 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl font-bold text-primary-color tracking-wide">Body Metrics</h1>
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-primary-color tracking-wide">Progress</h1>
+          <p className="mt-1 text-xs text-muted-color">Look for trends, then choose the next adjustment.</p>
+        </div>
         <div className="flex gap-2">
           <label className="flex items-center gap-1.5 btn-ghost rounded-xl px-3 py-2 text-xs font-medium cursor-pointer" style={{ fontSize: 12, padding: '8px 12px' }}>
             <Upload size={14} style={{ color: 'var(--accent)' }} />
@@ -268,7 +271,7 @@ export function BodyMetrics({ state, addBodyMetric, removeBodyMetric, addRenphoE
       <div className="glass p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">Renpho AI Trend Coach</h3>
+            <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">Renpho Trend Coach</h3>
             <div className="text-muted-color text-xs mt-1">{renphoEntries.length} readings · {renphoAnalysis.dateRange}</div>
           </div>
           <button onClick={loadRenphoRecommendation} disabled={renphoLoading || !renphoAnalysis.hasEnoughData} className="flex items-center gap-1.5 text-accent text-xs font-medium disabled:opacity-50">
@@ -282,16 +285,16 @@ export function BodyMetrics({ state, addBodyMetric, removeBodyMetric, addRenphoE
             <p className="text-primary-color text-sm leading-relaxed whitespace-pre-line">{renphoRecommendation}</p>
           </div>
         ) : (
-          <p className="text-muted-color text-xs italic">Upload a Renpho CSV, then tap Analyze for workout, diet, and body-composition recommendations. General fitness guidance only, not medical advice.</p>
+          <p className="text-muted-color text-xs italic">Upload a Renpho CSV, then tap Analyze for cautious fitness recommendations. This is general coaching context, not medical guidance.</p>
         )}
       </div>
 
       {/* Bio Age */}
       <div className={`glass rounded-2xl p-4 flex items-center justify-between ${bioAge < 36 ? 'bg-emerald-500/15' : bioAge <= 40 ? 'bg-amber-500/15' : 'bg-red-500/15'}`}>
         <div>
-          <div className="text-muted-color text-xs uppercase font-heading tracking-widest">Functional Bio Age</div>
+          <div className="text-muted-color text-xs uppercase font-heading tracking-widest">Functional Trend Index</div>
           <div className={`font-heading text-5xl font-bold mt-1 ${bioAge < 36 ? 'text-accent' : bioAge <= 40 ? 'text-amber-400' : 'text-red-400'}`}>{bioAge}</div>
-          <div className="text-muted-color text-xs mt-1">Actual age: {user?.actual_age ?? 'Set in Settings'} · Target: &lt;30</div>
+          <div className="text-muted-color text-xs mt-1">Actual age: {user?.actual_age ?? 'Set in Settings'} · directional coaching signal</div>
         </div>
         <div className="text-right">
           <div className="text-muted-color text-xs">Key drivers</div>
@@ -368,7 +371,7 @@ export function BodyMetrics({ state, addBodyMetric, removeBodyMetric, addRenphoE
             { label: 'Weight', target: '175 lbs', current: latest?.weight ? `${latest.weight} lbs` : '—' },
             { label: 'Body Fat', target: '15%', current: latest?.bodyFat ? `${latest.bodyFat}%` : '—' },
             { label: 'Visceral Fat', target: '<9', current: latest?.visceralFat ?? '—' },
-            { label: 'Bio Age', target: '<30', current: bioAge },
+            { label: 'Trend Index', target: 'lower over time', current: bioAge },
           ].map(({ label, target, current }) => (
             <div key={label} className="glass-elevated rounded-xl p-3">
               <div className="text-muted-color text-xs">{label}</div>
@@ -382,7 +385,7 @@ export function BodyMetrics({ state, addBodyMetric, removeBodyMetric, addRenphoE
       {/* AI analysis */}
       <div className="glass p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">AI Root Cause</h3>
+          <h3 className="font-heading text-sm font-semibold text-muted-color uppercase tracking-widest">Coach Interpretation</h3>
           <button onClick={loadInsight} disabled={loading} className="flex items-center gap-1.5 text-accent text-xs font-medium">
             {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             {loading ? 'Analyzing...' : 'Analyze'}
@@ -391,7 +394,7 @@ export function BodyMetrics({ state, addBodyMetric, removeBodyMetric, addRenphoE
         {insight ? (
           <p className="text-primary-color text-sm leading-relaxed">{insight}</p>
         ) : (
-          <p className="text-muted-color text-sm italic">Tap Analyze for body composition insights.</p>
+          <p className="text-muted-color text-sm italic">Tap Analyze for a cautious trend read and one next adjustment.</p>
         )}
       </div>
 

@@ -300,7 +300,7 @@ function ExerciseCard({ exercise, workoutLog, today, logSet, removeSet, state, i
               <p className="text-slate-200 text-sm leading-relaxed">{replacement}</p>
             </div>
           ) : (
-            <p className="text-slate-500 text-sm">Add your API key in Settings to get AI exercise replacements.</p>
+            <p className="text-slate-500 text-sm">Configure the Supabase AI coach function to get exercise replacements.</p>
           )}
           <button onClick={() => { setShowReplace(false); setReplacement('') }}
             className="w-full bg-slate-700 text-slate-300 rounded-xl py-3 text-sm font-medium">
@@ -343,9 +343,9 @@ function ReadinessCard({ state, workout, today }) {
     })
 
   const VERDICT_STYLE = {
-    PUSH:      { bg: 'bg-emerald-500/15 border-emerald-500/40', badge: 'bg-emerald-500 text-white', icon: '🚀' },
-    MAINTAIN:  { bg: 'bg-amber-500/15 border-amber-500/40',   badge: 'bg-amber-500 text-white',   icon: '✅' },
-    BACK_OFF:  { bg: 'bg-red-500/15 border-red-500/40',       badge: 'bg-red-500 text-white',      icon: '⚠️' },
+    PUSH:      { bg: 'bg-emerald-500/15 border-emerald-500/40', badge: 'bg-emerald-500 text-white', label: 'Push' },
+    MAINTAIN:  { bg: 'bg-amber-500/15 border-amber-500/40',   badge: 'bg-amber-500 text-white',   label: 'Maintain' },
+    BACK_OFF:  { bg: 'bg-red-500/15 border-red-500/40',       badge: 'bg-red-500 text-white',      label: 'Back off' },
   }
 
   async function getAssessment() {
@@ -354,14 +354,14 @@ function ReadinessCard({ state, workout, today }) {
       const context = `
 Today's workout: ${workout.name}
 Morning stiffness: ${stiffness !== null ? stiffness + '/5' : 'not logged'}
-Today's inflammation score: ${todayInflam !== null ? todayInflam.toFixed(1) + '/5' : 'not logged'}
+Today's recovery load: ${todayInflam !== null ? todayInflam.toFixed(1) + '/5' : 'not logged'}
 Recent session history: ${recentSets.length > 0 ? recentSets.join(', ') : 'no recent sessions'}
 `
       const prompt = `Pre-session readiness assessment.
 
 ${context}
 
-Based on this data, give me a readiness verdict and brief guidance. Your response MUST start with exactly one of these three words on the first line: PUSH, MAINTAIN, or BACK_OFF. Then on the next lines, give 2-3 sentences of specific guidance for today's session considering my L5-S1 condition and inflammation level. Be direct and actionable.`
+Based on this data, give me a readiness verdict and brief guidance. Your response MUST start with exactly one of these three words on the first line: PUSH, MAINTAIN, or BACK_OFF. Then on the next lines, give 2-3 sentences of specific guidance for today's session considering stiffness, recovery load, and spine-sensitive movements. Be direct, actionable, and avoid medical certainty.`
 
       const text = await getAIInsight(prompt, state, today)
 
@@ -385,7 +385,6 @@ Based on this data, give me a readiness verdict and brief guidance. Your respons
     <div className={`rounded-2xl p-4 border space-y-3 transition-all ${style ? style.bg : 'bg-slate-800 border-slate-700'}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-base">{style?.icon ?? '🧠'}</span>
           <h3 className="font-heading text-sm font-semibold text-white uppercase tracking-widest">Readiness Assessment</h3>
         </div>
         <button
@@ -404,7 +403,7 @@ Based on this data, give me a readiness verdict and brief guidance. Your respons
           Stiffness: {stiffness !== null ? `${stiffness}/5` : '—'}
         </span>
         <span className={`text-[10px] px-2 py-1 rounded-full font-medium ${todayInflam === null ? 'bg-slate-700 text-slate-400' : todayInflam >= 4 ? 'bg-red-500/20 text-red-300' : todayInflam >= 2.5 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
-          Inflammation: {todayInflam !== null ? `${todayInflam.toFixed(1)}/5` : '—'}
+          Recovery load: {todayInflam !== null ? `${todayInflam.toFixed(1)}/5` : '—'}
         </span>
         <span className="text-[10px] px-2 py-1 rounded-full bg-slate-700 text-slate-400 font-medium">
           Sessions: {recentSets.length > 0 ? recentSets.length + ' recent' : 'no data'}
@@ -420,7 +419,7 @@ Based on this data, give me a readiness verdict and brief guidance. Your respons
           <p className="text-slate-200 text-sm leading-relaxed">{assessment.guidance}</p>
         </div>
       ) : (
-        <p className="text-slate-500 text-xs italic">Tap Assess to get a push/maintain/back-off verdict based on your stiffness, inflammation, and recent sessions.</p>
+        <p className="text-slate-500 text-xs italic">Tap Assess to get a push/maintain/back-off verdict based on stiffness, recovery load, and recent sessions.</p>
       )}
     </div>
   )

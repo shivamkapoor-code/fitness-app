@@ -1,13 +1,12 @@
-import { Home, Dumbbell, UtensilsCrossed, TrendingUp, Pill, Flame, MessageCircle } from 'lucide-react'
+import { Home, Dumbbell, UtensilsCrossed, TrendingUp, Activity, MessageCircle } from 'lucide-react'
 
 const TABS = [
   { id: 'dashboard', label: 'Home', Icon: Home },
   { id: 'workout', label: 'Train', Icon: Dumbbell },
-  { id: 'nutrition', label: 'Food', Icon: UtensilsCrossed },
-  { id: 'body', label: 'Body', Icon: TrendingUp },
-  { id: 'supplements', label: 'Supps', Icon: Pill },
-  { id: 'inflammation', label: 'Inflam', Icon: Flame },
-  { id: 'chat', label: 'AI', Icon: MessageCircle },
+  { id: 'nutrition', label: 'Meals', Icon: UtensilsCrossed },
+  { id: 'recovery', label: 'Recover', Icon: Activity },
+  { id: 'body', label: 'Progress', Icon: TrendingUp },
+  { id: 'chat', label: 'Coach', Icon: MessageCircle },
 ]
 
 export function BottomNav({ active, onNavigate }) {

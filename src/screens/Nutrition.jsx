@@ -7,6 +7,7 @@ import { WORKOUT_SPLIT } from '../data/workouts'
 import { showToast } from '../utils/toast'
 import { analyzePhoto, getAIInsight } from '../ai/claude'
 import { BrowserMultiFormatReader } from '@zxing/browser'
+import { buildDailyCoachingSummary } from '../utils/fitnessCoach'
 
 const TABS = ['breakfast', 'lunch', 'dinner', 'snack']
 const MAX_PHOTO_EDGE = 1280
@@ -206,6 +207,7 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
   const currentWorkout = WORKOUT_SPLIT[state.workoutQueue.seq[state.workoutQueue.idx]]
   const workoutMealEntries = getWorkoutMealEntries(currentWorkout)
   const workoutMealTotals = sumMealEntries(workoutMealEntries)
+  const coachSummary = buildDailyCoachingSummary(state, today)
 
   const [showLibrary, setShowLibrary] = useState(false)
   const [showManual, setShowManual] = useState(false)
@@ -359,7 +361,16 @@ export function Nutrition({ state, addMeal, removeMeal, today, addCustomItem, re
 
   return (
     <div className="px-4 py-4 pb-20 space-y-4">
-      <h1 className="font-heading text-2xl font-bold text-white tracking-wide">Nutrition</h1>
+      <header>
+        <h1 className="font-heading text-2xl font-bold text-white tracking-wide">Meals</h1>
+        <p className="mt-1 text-xs text-slate-500">Eat to support today’s training decision.</p>
+      </header>
+
+      <div className={`rounded-2xl border p-4 ${coachSummary.protein.isOnTrack ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-amber-500/30 bg-amber-500/10'}`}>
+        <div className="font-heading text-xs font-semibold uppercase tracking-widest text-slate-400">Today’s nutrition focus</div>
+        <h2 className="mt-1 font-heading text-2xl font-bold leading-none text-white">{coachSummary.teamGuidance.nutrition.title}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-300">{coachSummary.teamGuidance.nutrition.text}</p>
+      </div>
 
       {/* Macro rings */}
       <div className="bg-slate-800 rounded-2xl p-4 space-y-3">
